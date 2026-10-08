@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Sign in · Miller{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/accounts.css' %}">
+{% endblock %}
+
+{% block content %}
+<main class="signin">
+  <h1 class="signin__title">{% if signed_out %}You’re signed out.{% else %}<c-ui.logo />{% endif %}</h1>
+  <c-ui.messages />
+  {% if google_enabled %}
+    <a class="text-btn signin__action" href="{% url 'accounts:google-start' %}">{% if signed_out %}Sign back in{% else %}Continue with Google{% endif %}</a>
+    {% if request.user.is_guest %}<p class="signin__note">Your todos from this browser will come with you.</p>{% endif %}
+    <a class="text-btn signin__action" href="{% url 'board:index' %}">Back to the list</a>
+  {% else %}
+    <p class="signin__note">Google sign-in isn’t configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.</p>
+  {% endif %}
+</main>
+{% endblock %}

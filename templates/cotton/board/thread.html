@@ -1,0 +1,24 @@
+<c-vars current comments focus="" />
+<article class="board__pane thread" id="thread" aria-label="Thread">
+{% if current %}
+  <div class="pane-bar">
+    <span class="thread__crumb"><b class="thread__crumb-strong">#{{ current.position }} today</b> · {{ current.days_on_list }}</span>
+    <c-ui.icon-button label="Mark done" title="Mark done" class="icon-btn--small thread__done" hx-post="{% url 'board:todo-close' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML"><c-ui.icon name="check" size="14" sw="1.8" /></c-ui.icon-button>
+  </div>
+  <div class="thread__heading">
+    <c-todos.title-form :todo="current" />
+    <c-ui.icon-button label="Delete todo" title="Delete" class="icon-btn--small icon-btn--quiet" hx-post="{% url 'board:todo-delete' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML"><c-ui.icon name="trash" size="14" sw="1.6" /></c-ui.icon-button>
+  </div>
+  <div class="thread__comments">
+    {% for comment in comments %}<c-comments.comment :comment="comment" />{% empty %}
+    <div class="thread__empty">
+      <p class="thread__empty-title">No comments yet.</p>
+      <p class="thread__empty-sub">Start the thread below. Notes, links, files, anything.</p>
+    </div>
+    {% endfor %}
+  </div>
+  <c-comments.form :todo_id="current.id" :focus="focus" />
+{% else %}
+  <p class="thread__placeholder">Add a todo, then comment on it here.</p>
+{% endif %}
+</article>

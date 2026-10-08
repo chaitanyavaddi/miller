@@ -1,0 +1,60 @@
+/* — list header: the label on the left; the search control
+     on the right, above the age column. Searching turns the bar into the search field, and the
+     control becomes the x that closes it. — */
+.todo-list__search, .todo-list__search-close { display: none; }
+.todo-list__label { margin-right: auto; }
+.todo-list__search-toggle { flex: none; justify-content: flex-end; margin-right: 36px; } /* the done tick (28) + row gap (8) */
+
+.todo-list.todo-list--searching .todo-list__label,
+.todo-list.todo-list--searching .icon-btn--quiet { display: none; }
+.todo-list.todo-list--searching .todo-list__search { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; }
+.todo-list.todo-list--searching .todo-list__search-close { display: flex; }
+.todo-list__search svg { flex: none; color: var(--text-4); }
+.todo-list__search-input:focus-visible { outline: none; }
+.todo-list__search-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }  /* our x clears and closes */
+.todo-list__search-input { flex: 1 1 auto; min-width: 0; height: 20px; border: none; outline: none; background: transparent; padding: 0; font: inherit; font-size: 13px; color: var(--text); }
+
+/* — rows. The grip lives in a 24px left gutter inside the scroll container (overflow would clip it). — */
+.todo-list__rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; margin: 24px 0 0 -24px; padding: 0 12px 0 24px; display: flex; flex-direction: column;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.todo-list__rows::-webkit-scrollbar { width: 4px; }
+.todo-list__rows::-webkit-scrollbar-track { background: transparent; }
+.todo-list__rows::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.todo-list__rows--drop-end::after { content: ""; height: 2px; background: var(--text); }
+.todo-list__empty { height: 36px; display: flex; align-items: center; font-size: 13px; color: var(--text-4); }
+.todo-list__empty--nomatch { padding-left: 58px; }
+/* Nothing in the list: the composer takes the first row's place, right under the heading. */
+.todo-list__rows:not(:has(*)) + .todo-form .composer { margin-top: 0; }
+
+.todo-row { position: relative; display: flex; align-items: center; gap: 8px; }
+.todo-row__grip { position: absolute; left: -24px; top: 0; width: 24px; height: 36px; display: flex; align-items: center; color: var(--text-4); cursor: grab; opacity: 0; }
+.todo-row:hover .todo-row__grip { opacity: 1; }
+.todo-row__grip:hover { color: var(--text); }
+.todo-list--searching .todo-row__grip { display: none; }
+.todo-row__main { flex: 1 1 auto; min-width: 0; height: 36px; background: none; border: none; padding: 0; display: flex; align-items: center; gap: 14px; text-align: left; color: inherit; cursor: pointer; }
+.todo-row__pos { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-4); width: 44px; flex: none; }
+.todo-row__title { font-size: 13.5px; font-weight: 400; color: var(--text-3); flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
+.todo-row__age { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); width: 36px; text-align: right; flex: none; }
+.todo-row:hover .todo-row__title { color: var(--text); }
+.todo-row--current .todo-row__pos, .todo-row--current .todo-row__title { color: var(--text); }
+.todo-row--current .todo-row__title { font-weight: 500; }
+.todo-row__actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.todo-row__action { opacity: 0; width: 28px; height: 36px; background: none; border: none; padding: 0; cursor: pointer; color: var(--text-3); display: flex; align-items: center; justify-content: flex-end; }
+.todo-row:hover .todo-row__action, .todo-row:focus-within .todo-row__action { opacity: 1; }
+.todo-row__action:hover { color: var(--text); }
+.todo-row--dragging { opacity: 0.3; }
+.todo-row--drop-before::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; background: var(--text); }
+
+/* — done rows: the last few closed todos end the list, quieter than the active ones — */
+.todo-row:not(.todo-row--done) + .todo-row--done { margin-top: 8px; }
+.todo-row--done .todo-row__main { height: 30px; cursor: default; }
+.todo-row--done .todo-row__pos { color: var(--text-4); display: flex; align-items: center; }
+.todo-row--done .todo-row__title { color: var(--text-4); text-decoration: line-through; text-decoration-color: var(--border); }
+.todo-row--done:hover .todo-row__title { color: var(--text-3); }
+.todo-row--done .todo-row__action { height: 30px; }
+
+@media (max-width: 760px) {
+  .todo-list__rows { overflow: visible; margin-left: 0; padding-left: 0; }
+  .todo-row__action { opacity: 1; }
+  .todo-row__grip { display: none; } /* HTML5 drag-and-drop does not fire on touch */
+}

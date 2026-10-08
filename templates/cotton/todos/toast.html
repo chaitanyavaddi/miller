@@ -1,0 +1,9 @@
+<c-vars undo="" />
+<div class="toast" role="status" aria-live="polite">
+  {% if undo %}
+  <div class="toast__item">
+    <span class="toast__text">{{ undo.removal.label }} “{{ undo.title }}”</span>
+    <c-ui.text-button class="text-btn--small toast__action" hx-post="{% url 'board:todo-reopen' undo.id %}" hx-vals='{"index": {{ undo.index }}}' hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML">Undo</c-ui.text-button>
+  </div>
+  {% endif %}
+</div>

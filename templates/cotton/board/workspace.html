@@ -1,0 +1,7 @@
+<c-vars rows current comments done reopen_index undo="" oob="" />
+<div class="board" id="workspace"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <c-todos.list :rows="rows" :current="current" :done="done" :reopen_index="reopen_index" />
+  <c-board.thread :current="current" :comments="comments" />
+  <c-todos.toast :undo="undo" />
+  <form id="board-state" hidden><input type="hidden" name="t" value="{{ current.id|default:'' }}"></form>
+</div>

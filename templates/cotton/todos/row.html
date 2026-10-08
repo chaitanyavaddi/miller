@@ -1,0 +1,15 @@
+<c-vars row current="" />
+<div class="todo-row{% if row.id == current %} todo-row--current{% endif %}" data-id="{{ row.id }}">
+  <span class="todo-row__grip" draggable="true" title="Drag to reorder"><c-ui.icon name="grip" size="12" /></span>
+  <button type="button" class="todo-row__main" hx-get="{% url 'board:todo-detail' row.id %}" hx-target="#thread" hx-swap="outerHTML" hx-sync="#rows:replace">
+    <span class="todo-row__pos">{{ row.position|pad2 }}</span>
+    <span id="todo-title-{{ row.id }}" class="todo-row__title">{{ row.title }}</span>
+    <span class="todo-row__age" title="Time since created">{{ row.age }}d</span>
+  </button>
+  <span class="todo-row__actions">
+    <button type="button" class="todo-row__action" aria-label="Close {{ row.title }}" title="Mark done"
+            hx-post="{% url 'board:todo-close' row.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML">
+      <c-ui.icon name="check" size="14" sw="1.8" />
+    </button>
+  </span>
+</div>

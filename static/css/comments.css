@@ -1,0 +1,27 @@
+.comment { display: grid; grid-template-columns: 76px minmax(0, 1fr); column-gap: 10px; }
+.comment__time { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-4); line-height: 20px; white-space: nowrap; }
+.comment__body { display: flex; flex-direction: column; gap: 2px; }
+.comment__text { font-size: 13.5px; line-height: 1.6; color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment__files { display: flex; flex-direction: column; align-items: flex-start; }
+
+.file-link { padding: 6px 0; display: flex; align-items: center; gap: 6px; color: var(--text); text-decoration: none; }
+.file-link__name { font-size: 12.5px; text-decoration: underline dotted; text-underline-offset: 4px; overflow-wrap: anywhere; }
+.file-link:hover .file-link__name { text-decoration-style: solid; }
+.file-link__size { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-4); }
+.file-link--pending { height: 24px; padding: 0; }
+
+.comment-form__pending { display: flex; flex-direction: column; align-items: flex-start; margin-top: 12px; flex: none; }
+.comment-form__pending:empty { display: none; }
+
+/* The attach and send controls appear once the composer is in use. */
+.composer__actions { display: flex; align-items: center; flex: none; opacity: 0; pointer-events: none; }
+.composer:focus-within .composer__actions,
+.composer:has(.composer__input:not(:placeholder-shown)) .composer__actions,
+.composer--has-files .composer__actions { opacity: 1; pointer-events: auto; }
+.composer__attach { display: flex; align-items: center; justify-content: center; width: 32px; height: 40px; cursor: pointer; color: var(--text-3); position: relative; }
+.composer__attach:hover { color: var(--text); }
+.composer__file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+.composer__send { height: 40px; padding: 0; background: none; border: none; cursor: pointer; color: var(--text-4); font-family: var(--font-mono); font-size: 11px; }
+.composer:has(.composer__input:not(:placeholder-shown)) .composer__send,
+.composer--has-files .composer__send,
+.composer__send:hover { color: var(--text); }

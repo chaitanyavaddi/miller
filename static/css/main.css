@@ -1,0 +1,114 @@
+/* Miller — Symmetric's minimal styling (mono labels, dotted-underline text buttons, no boxes or
+   fills) in a warm palette. Shared tokens, base elements and components used on every page. */
+:root {
+  --bg:         #f7f7f4;
+  --text:       #26251e;
+  --text-2:     #45443d;
+  --text-3:     #5c5b54;
+  --text-4:     #78776f;
+  --border:     #d6d5cf;
+  --st-blocked: #b3261e;
+  --font-ui:    'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-mono:  'Geist Mono', ui-monospace, monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-ui); -webkit-font-smoothing: antialiased; }
+a { color: var(--text); }
+button { font: inherit; }
+button:focus-visible, input:focus-visible, a:focus-visible { outline: 1px dotted var(--text); outline-offset: 3px; }
+input::placeholder { color: var(--text-4); opacity: 1; }
+p { margin: 0; }
+
+/* — text button — */
+.text-btn { background: none; border: none; padding: 8px 0; cursor: pointer; color: var(--text-3); font-size: 13px;
+  text-decoration: underline dotted; text-underline-offset: 4px; }
+.text-btn:hover { color: var(--text); }
+.text-btn--small { padding: 0; height: 20px; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; text-underline-offset: 3px; }
+a.text-btn { display: inline-block; }
+
+/* — icon button — */
+.icon-btn { background: none; border: none; padding: 0; cursor: pointer; color: var(--text-3); display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
+.icon-btn:hover { color: var(--text); }
+.icon-btn--small { width: 28px; height: 20px; }
+/* Surfaces only while its bar is hovered: for actions that should be deliberate, like delete. */
+.icon-btn--quiet { opacity: 0; }
+.pane-bar:hover .icon-btn--quiet, .icon-btn--quiet:focus-visible { opacity: 1; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; }
+.avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--text); color: var(--bg); font-size: 11px; font-weight: 500; display: flex; align-items: center; justify-content: center; }
+
+/* — page — */
+.page { max-width: 1040px; height: 100vh; margin: 0 auto; padding: 108px 32px 32px; display: flex; flex-direction: column; overflow: hidden; }
+
+/* — top bar: full width, logo far left, controls far right; both stay out of sight until the
+     bar is hovered (or a control in it has focus, or the account menu is open). — */
+.topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; height: 68px; padding: 24px 32px 0; }
+.topbar__brand, .topbar__actions { opacity: 0; transition: opacity 0.15s ease; }
+.topbar:hover .topbar__brand, .topbar:hover .topbar__actions,
+.topbar:focus-within .topbar__brand, .topbar:focus-within .topbar__actions,
+.topbar:has(.account-menu--open) .topbar__brand, .topbar:has(.account-menu--open) .topbar__actions { opacity: 1; }
+.topbar__brand { font-size: 15px; font-weight: 600; letter-spacing: -0.03em; }
+.logo { display: inline-flex; align-items: center; gap: 0.4em; }
+.logo__mark { width: 1.15em; height: auto; flex: none; }
+.logo__word { letter-spacing: 0; }
+.topbar__actions { position: relative; display: flex; align-items: center; }
+.topbar__account { background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: flex-end; width: 44px; height: 44px; }
+
+/* Account menu: who you are, the keyboard shortcuts, the account action. A hairline frame
+   separates it from the list underneath; nothing heavier. */
+.account-menu { position: absolute; right: 0; top: 48px; z-index: 5; width: 264px; display: none; flex-direction: column;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+.account-menu--open { display: flex; }
+.account-menu__section { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px 16px; }
+.account-menu__section + .account-menu__section { border-top: 1px solid var(--border); }
+.account-menu__section .eyebrow { margin-bottom: 6px; }
+.account-menu__name { font-size: 13.5px; font-weight: 500; color: var(--text); letter-spacing: -0.01em; }
+.account-menu__detail { font-size: 12px; color: var(--text-4); overflow-wrap: anywhere; }
+.account-menu__action { padding: 6px 0 0; color: var(--text); }
+.account-menu__section:last-child .account-menu__action:only-child { padding: 0; }
+
+.shortcuts { display: grid; grid-template-columns: auto 1fr; column-gap: 14px; row-gap: 8px; margin: 0; width: 100%; align-items: baseline; }
+.shortcuts__keys { display: flex; gap: 3px; margin: 0; }
+.shortcuts__keys kbd { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-3); min-width: 16px; text-align: center; }
+.shortcuts__what { margin: 0; font-size: 12.5px; color: var(--text-3); }
+
+/* — composer: a bare input, flush left (add a todo, add a comment) — */
+.composer { display: flex; align-items: center; gap: 10px; height: 40px; margin-top: 12px; padding-right: 12px; flex: none; }
+/* The + marks the line as somewhere to type, and darkens while it has focus (it replaces the outline). */
+.composer__plus { font-family: var(--font-mono); font-size: 13px; color: var(--text-4); flex: none; }
+.composer:focus-within .composer__plus { color: var(--text); }
+.composer__input { flex: 1 1 auto; min-width: 0; border: none; outline: none; background: transparent; padding: 0; font: inherit; font-size: 13.5px; color: var(--text); }
+.composer__input:focus-visible { outline: none; }
+.composer__hint { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); flex: none; display: none; }
+.composer__input:not(:placeholder-shown) ~ .composer__hint { display: inline; }
+
+/* — form messages — */
+.form-messages { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.form-message { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+.form-message--error { color: var(--st-blocked); }
+
+/* — overlay — */
+#overlay:empty { display: none; }
+.overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.overlay__scrim { position: absolute; inset: 0; border: none; padding: 0; margin: 0; background: rgba(247, 247, 244, 0.94); cursor: default; }
+
+/* — notice: a quiet line of text in the empty strip at the top, with Undo as a dotted link — */
+.toast { position: fixed; top: 36px; left: 50%; transform: translateX(-50%); z-index: 30; pointer-events: none; }
+.toast__item { pointer-events: auto; display: flex; align-items: center; gap: 10px; max-width: 420px; font-size: 12.5px; color: var(--text-3);
+  animation: toast-in 0.2s ease; transition: opacity 0.2s ease; }
+.toast__item--leaving { opacity: 0; }
+.toast__text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.toast__action { flex: none; color: var(--text); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-4px); } }
+
+@media (hover: none) {
+  .topbar__brand, .topbar__actions { opacity: 1; }
+}
+
+@media (max-width: 760px) {
+  .page { height: auto; min-height: 100vh; overflow: visible; padding: 100px 20px 24px; }
+  .topbar { position: absolute; padding: 16px 20px 0; height: 60px; }
+  .toast { top: 26px; }
+}

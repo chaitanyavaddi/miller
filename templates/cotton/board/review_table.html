@@ -1,0 +1,29 @@
+<c-vars rows filters />
+<div class="review__table-wrap">
+  {% if rows %}
+  <table class="review__table">
+    <thead>
+      <tr>
+        <th class="review__th">Todo</th>
+        <th class="review__th">{% if filters.status == "open" %}Place{% elif filters.status == "deleted" %}Deleted{% else %}Closed{% endif %}</th>
+        <th class="review__th review__th--right">On list</th>
+        <th class="review__th"><span class="review__sr">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr class="review__row">
+        <td class="review__title">
+          <button type="button" class="review__open" title="See its thread" hx-get="{% url 'board:review-thread' row.id %}?status={{ filters.status }}&period={{ filters.period }}" hx-target="#review-body" hx-swap="innerHTML">{{ row.title }}</button>
+        </td>
+        <td class="review__meta">{{ row.stamp }}</td>
+        <td class="review__meta review__meta--right">{{ row.days_on_list }}d</td>
+        <td class="review__action"><c-board.review-actions :row="row" :filters="filters" quiet="1" /></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="review__empty">{% if filters.status == "open" %}Nothing added{% elif filters.status == "deleted" %}Nothing deleted{% else %}Nothing closed{% endif %}{% if filters.period != "all" %} {{ filters.period_label|lower }}{% endif %}.</p>
+  {% endif %}
+</div>

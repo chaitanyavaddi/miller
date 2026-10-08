@@ -1,0 +1,16 @@
+<c-vars todo_id data="" focus="" />
+<div id="comment-form" class="comment-form">
+  <c-ui.messages />
+  <form hx-post="{% url 'board:comment-create' todo_id %}" hx-target="#comment-form" hx-swap="outerHTML" hx-encoding="multipart/form-data">
+    {% csrf_token %}
+    <div class="comment-form__pending" id="pending"></div>
+    <div class="composer" id="composer">
+      <span class="composer__plus" aria-hidden="true">+</span>
+      <input type="text" class="composer__input" id="comment-input" name="body" aria-label="New comment" placeholder="Add a comment" autocomplete="off" value="{{ data.body|default:'' }}" {% if focus or data %}autofocus{% endif %}>
+      <span class="composer__actions">
+        <label class="composer__attach" aria-label="Attach a file"><c-ui.icon name="attach" size="14" sw="1.6" /><input type="file" class="composer__file" name="files" id="files" multiple></label>
+        <button type="submit" class="composer__send">↵ Send</button>
+      </span>
+    </div>
+  </form>
+</div>

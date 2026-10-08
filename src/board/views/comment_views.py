@@ -1,0 +1,18 @@
+from django.views import View
+
+from board.mixins import BoardResponseMixin
+from comments.schemas import CommentCreateSchema
+from comments.service import CommentService
+from todos.mixins import TodoPermissionRequiredMixin
+from utils.view_helper import render_fragment, retarget
+
+
+class CommentCreateView(TodoPermissionRequiredMixin, BoardResponseMixin, View):
+    permission_required = "todos.change_todo"
+
+    def post(self, request, pk):
+        data = CommentCreateSchema.from_post(request)
+        if not data.is_valid():
+            return render_fragment(request, "comments.form", {"todo_id": self.todo.id, "data": data})
+        CommentService.add(self.todo, data)
+        return retarget(self.render_thread(self.todo.id, focus=True), "#thread")

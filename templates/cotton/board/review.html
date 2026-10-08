@@ -1,0 +1,42 @@
+<c-vars filters statuses periods insights chart rows />
+<div class="overlay">
+  <button type="button" class="overlay__scrim" aria-label="Close review" data-action="overlay-close"></button>
+  <div class="review" role="dialog" aria-modal="true" aria-label="Review">
+    <div class="review__filters">
+      <span class="review__filter-group">
+        {% for value, label in statuses %}
+        <button type="button" class="review__filter{% if value == filters.status %} review__filter--active{% endif %}" aria-pressed="{% if value == filters.status %}true{% else %}false{% endif %}"
+                hx-get="{% url 'board:review' %}?status={{ value }}&period={{ filters.period }}" hx-target="#overlay" hx-swap="innerHTML">{{ label }}</button>
+        {% endfor %}
+      </span>
+      <span class="review__filter-group review__filter-group--period">
+        {% for value, label in periods %}
+        <button type="button" class="review__filter{% if value == filters.period %} review__filter--active{% endif %}" aria-pressed="{% if value == filters.period %}true{% else %}false{% endif %}"
+                hx-get="{% url 'board:review' %}?status={{ filters.status }}&period={{ value }}" hx-target="#overlay" hx-swap="innerHTML">{{ label }}</button>
+        {% endfor %}
+      </span>
+      <c-ui.icon-button label="Close review" title="Close" class="icon-btn--small review__close" data-action="overlay-close"><c-ui.icon name="x" size="14" /></c-ui.icon-button>
+    </div>
+
+    <div class="review__summary">
+      <p class="review__headline">
+        {% if filters.period == "all" %}You’ve closed <span class="review__number">{{ insights.closed }}</span> todo{{ insights.closed|pluralize }} since you started.
+        {% elif insights.closed %}You closed <span class="review__number">{{ insights.closed }}</span> todo{{ insights.closed|pluralize }} {{ filters.period_label|lower }}.
+        {% else %}Nothing closed {{ filters.period_label|lower }} yet.{% endif %}
+      </p>
+      <p class="review__facts">
+        {% if insights.delta %}{{ insights.delta_size }} {% if insights.delta > 0 %}more{% else %}fewer{% endif %} than by this time {{ insights.previous_name }}.
+        {% elif insights.delta == 0 and insights.closed %}Same pace as {{ insights.previous_name }}.{% endif %}
+        {% if insights.streak > 1 %}On a {{ insights.streak }}-day streak.{% endif %}
+        {% if insights.best_week %}Best week: {{ insights.best_week }}.{% endif %}
+        {% if insights.longest_wait.days %}Longest wait you cleared: “{{ insights.longest_wait.title }}”, {{ insights.longest_wait.days }} day{{ insights.longest_wait.days|pluralize }}.{% endif %}
+      </p>
+    </div>
+
+    <c-board.review-chart :chart="chart" />
+
+    <div class="review__body" id="review-body">
+      <c-board.review-table :rows="rows" :filters="filters" />
+    </div>
+  </div>
+</div>

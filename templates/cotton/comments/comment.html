@@ -1,0 +1,14 @@
+<c-vars comment />
+<div class="comment">
+  <time class="comment__time" datetime="{{ comment.created_at|date:'c' }}">{{ comment.created_at|date:"M j, H:i" }}</time>
+  <div class="comment__body">
+    {% if comment.body %}<p class="comment__text">{{ comment.body }}</p>{% endif %}
+    {% with attachments=comment.attachments.all %}
+    {% if attachments %}
+    <div class="comment__files">
+      {% for attachment in attachments %}<c-comments.file-link :attachment="attachment" />{% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+  </div>
+</div>

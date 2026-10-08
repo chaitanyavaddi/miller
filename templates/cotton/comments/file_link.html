@@ -1,0 +1,6 @@
+<c-vars attachment />
+<a href="{{ attachment.url }}" class="file-link" target="_blank" rel="noopener">
+  {% if attachment.is_image %}<c-ui.icon name="image" size="13" sw="1.6" />{% else %}<c-ui.icon name="doc" size="13" sw="1.6" />{% endif %}
+  <span class="file-link__name">{{ attachment.name }}</span>
+  <span class="file-link__size">{{ attachment.size|filesize }}</span>
+</a>

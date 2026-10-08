@@ -1,0 +1,9 @@
+<c-vars todo renamed="" />
+<form id="title-form-{{ todo.id }}" class="title-form" hx-post="{% url 'board:todo-rename' todo.id %}" hx-trigger="submit, change" hx-target="#title-form-{{ todo.id }}" hx-swap="outerHTML">
+  {% csrf_token %}
+  <h1 class="thread__title">
+    <input type="text" class="title-form__input" name="title" value="{{ todo.title }}" data-original="{{ todo.title }}" maxlength="300" required autocomplete="off" aria-label="Todo title" title="Click to rename">
+  </h1>
+  <c-ui.messages />
+</form>
+{% if renamed %}<span id="todo-title-{{ todo.id }}" class="todo-row__title" hx-swap-oob="true">{{ todo.title }}</span>{% endif %}

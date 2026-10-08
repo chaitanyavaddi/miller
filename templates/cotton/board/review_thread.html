@@ -1,0 +1,14 @@
+<c-vars filters row comments />
+<div class="review-thread">
+  <div class="review-thread__bar">
+    <c-ui.text-button class="text-btn--small" hx-get="{% url 'board:review' %}?status={{ filters.status }}&period={{ filters.period }}" hx-target="#overlay" hx-swap="innerHTML">← All todos</c-ui.text-button>
+    <c-board.review-actions :row="row" :filters="filters" />
+  </div>
+  <div class="review-thread__head">
+    <span class="thread__crumb"><b class="thread__crumb-strong">{{ row.state_label }} {{ row.stamp }}</b> · {{ row.days_on_list }} day{{ row.days_on_list|pluralize }} on list</span>
+    <h2 class="review-thread__title">{{ row.title }}</h2>
+  </div>
+  <div class="review-thread__comments">
+    {% for comment in comments %}<c-comments.comment :comment="comment" />{% empty %}<p class="review__empty">No comments on this one.</p>{% endfor %}
+  </div>
+</div>

@@ -1,0 +1,80 @@
+/* — the board: the todo list on the left, the selected todo's thread always on the right — */
+.board { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); column-gap: 56px; }
+.board__pane { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; }
+.pane-bar { display: flex; align-items: center; justify-content: space-between; height: 20px; padding-right: 12px; flex: none; }
+
+.thread__crumb { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; }
+.thread__crumb-strong { font-weight: 400; color: var(--text); }
+.thread__heading { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding-right: 12px; flex: none; }
+.thread__heading:hover .icon-btn--quiet { opacity: 1; }
+.thread__done { justify-content: flex-end; }
+.thread__title { margin: 0; height: 24px; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.025em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; }
+
+/* The thread title is the rename field: it looks like the heading until it has focus. */
+.title-form { flex: 1 1 auto; min-width: 0; }
+.title-form__input { width: 100%; height: 24px; border: none; outline: none; background: transparent; padding: 0; font: inherit; color: var(--text); text-overflow: ellipsis; cursor: text; }
+.title-form__input:focus { text-decoration: underline dotted var(--text-4); text-underline-offset: 6px; text-decoration-thickness: 1px; }
+.thread__comments { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 24px; padding-right: 12px; display: flex; flex-direction: column; gap: 20px;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.thread__comments::-webkit-scrollbar { width: 4px; }
+.thread__comments::-webkit-scrollbar-track { background: transparent; }
+.thread__comments::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.thread__empty { margin: auto; font-size: 13px; color: var(--text-4); text-align: center; }
+.thread__empty-title { color: var(--text-3); }
+.thread__empty-sub { margin-top: 4px; }
+.thread__placeholder { padding-top: 40px; font-size: 13px; color: var(--text-4); }
+
+/* — review modal: filters, what the period adds up to, an ink chart, every todo in a table — */
+/* Fixed height: switching between the table and a thread never moves anything above it. */
+.review { position: relative; max-width: 720px; width: 100%; height: min(680px, calc(100vh - 96px)); display: flex; flex-direction: column; gap: 24px; background: var(--bg); padding: 8px 0; }
+.review__filters { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.review__filter-group--period { margin-left: auto; }
+.review__close { margin-right: -6px; }
+.review__filter-group { display: flex; align-items: center; gap: 4px; }
+.review__filter { background: none; border: none; padding: 0 12px 0 0; height: 32px; cursor: pointer; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-4); text-underline-offset: 4px; }
+.review__filter:hover { color: var(--text); }
+.review__filter--active { color: var(--text); text-decoration: underline dotted; }
+.review__summary { display: flex; flex-direction: column; gap: 8px; }
+.review__headline { font-size: 22px; line-height: 1.35; font-weight: 500; letter-spacing: -0.025em; }
+.review__number { font-weight: 600; }
+.review__facts { font-size: 13px; line-height: 1.6; color: var(--text-3); }
+.review__facts:empty { display: none; }
+
+.review-chart { width: 100%; height: auto; display: block; overflow: visible; }
+.review-chart__baseline { stroke: var(--border); stroke-width: 1; }
+.review-chart__hit { fill: transparent; }
+.review-chart__bar { fill: var(--text); }
+.review-chart__slot:hover .review-chart__bar { fill: #000; }
+.review-chart__value, .review-chart__label { font-family: var(--font-mono); font-size: 10px; fill: var(--text-4); }
+.review-chart__value { fill: var(--text); }
+.review-chart__slot--current .review-chart__label { fill: var(--text); }
+
+.review__body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.review__table-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 12px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.review__table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.review__th { position: sticky; top: 0; background: var(--bg); text-align: left; font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0 8px; }
+.review__th:nth-child(2) { width: 88px; }
+.review__th:nth-child(3) { width: 64px; }
+.review__th:nth-child(4) { width: 112px; }
+.review__th--right, .review__meta--right { text-align: right; padding-right: 16px; }
+.review__row:hover .review__title { color: var(--text); }
+.review__open { max-width: 100%; background: none; border: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.review__open:hover { color: var(--text); text-decoration: underline dotted; text-underline-offset: 4px; }
+.review__title { height: 36px; font-size: 13.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; padding-right: 16px; }
+.review__meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.review__action { text-align: right; }
+.review__actions { display: inline-flex; align-items: center; gap: 6px; }
+.review__row:hover .icon-btn--quiet { opacity: 1; }
+.review__empty { font-size: 13px; color: var(--text-4); padding: 8px 0; }
+.review-thread { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 20px; }
+.review-thread__bar { display: flex; align-items: center; justify-content: space-between; padding-right: 12px; }
+.review-thread__head { display: flex; flex-direction: column; gap: 12px; }
+.review-thread__title { margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.025em; overflow-wrap: anywhere; }
+.review-thread__comments { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 12px; display: flex; flex-direction: column; gap: 20px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.review__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+@media (max-width: 760px) {
+  .board { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; row-gap: 40px; }
+  .board__pane { height: auto; }
+  .thread__comments { overflow: visible; }
+}

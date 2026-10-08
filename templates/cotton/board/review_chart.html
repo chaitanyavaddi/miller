@@ -1,0 +1,13 @@
+<c-vars chart />
+<svg class="review-chart" viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img" aria-label="Todos closed over this period">
+  <line class="review-chart__baseline" x1="0" x2="{{ chart.width }}" y1="{{ chart.baseline }}" y2="{{ chart.baseline }}"></line>
+  {% for bar in chart.bars %}
+  <g class="review-chart__slot{% if bar.is_current %} review-chart__slot--current{% endif %}">
+    <title>{{ bar.tooltip }}</title>
+    <rect class="review-chart__hit" x="{{ bar.slot_x }}" y="0" width="{{ bar.slot_width }}" height="{{ chart.height }}"></rect>
+    {% if bar.path %}<path class="review-chart__bar" d="{{ bar.path }}"></path>{% endif %}
+    {% if bar.is_peak %}<text class="review-chart__value" x="{{ bar.label_x }}" y="{{ bar.value_y }}" text-anchor="middle">{{ bar.value_label }}</text>{% endif %}
+    {% if bar.show_label %}<text class="review-chart__label" x="{{ bar.label_x }}" y="{{ chart.label_y }}" text-anchor="middle">{{ bar.label }}</text>{% endif %}
+  </g>
+  {% endfor %}
+</svg>

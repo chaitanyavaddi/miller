@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/board.css' %}">
+<link rel="stylesheet" href="{% static 'css/todos.css' %}">
+<link rel="stylesheet" href="{% static 'css/comments.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/todos.js' %}" defer></script>
+<script src="{% static 'js/comments.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<c-layout.topbar :user="request.user" />
+<div class="page">
+  <c-board.workspace :rows="rows" :current="current" :comments="comments" :undo="undo" :done="done" :reopen_index="reopen_index" />
+</div>
+<div id="overlay"></div>
+{% endblock %}
