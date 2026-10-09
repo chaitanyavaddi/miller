@@ -22,7 +22,6 @@
 .thread__empty { margin: auto; font-size: 13px; color: var(--text-4); text-align: center; }
 .thread__empty-title { color: var(--text-3); }
 .thread__empty-sub { margin-top: 4px; }
-.thread__placeholder { padding-top: 40px; font-size: 13px; color: var(--text-4); }
 
 /* — review modal: filters, what the period adds up to, an ink chart, every todo in a table — */
 /* Fixed height: switching between the table and a thread never moves anything above it. */
