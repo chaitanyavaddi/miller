@@ -62,6 +62,20 @@
   new MutationObserver(() => document.querySelectorAll('.toast__item').forEach(armToast))
     .observe(document.documentElement, { childList: true, subtree: true });
 
+  /* — first visit: tell the server the browser's time zone, so the user's days start at their
+   *   midnight. Only while none is saved; one the user picks in settings is never overridden. — */
+  const detect = document.getElementById('timezone-detect');
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (detect && zone) {
+    fetch(detect.dataset.url, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken() },
+      body: new URLSearchParams({ timezone: zone, detected: '1' }),
+    }).then(response => {
+      if (response.status === 200) document.body.dispatchEvent(new Event('board-changed'));
+    }).catch(() => {});
+  }
+
   /* Sent by the server (HX-Trigger) or by another script once the overlay has done its job. */
   document.addEventListener('overlay-close', closeOverlay);
 

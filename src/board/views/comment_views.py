@@ -8,7 +8,7 @@ from utils.view_helper import render_fragment, retarget
 
 
 class CommentCreateView(TodoPermissionRequiredMixin, BoardResponseMixin, View):
-    permission_required = "todos.change_todo"
+    permission_required = "todos.comment_todo"
 
     def post(self, request, pk):
         data = CommentCreateSchema.from_post(request)

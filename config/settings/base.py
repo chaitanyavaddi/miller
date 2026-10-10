@@ -15,6 +15,7 @@ INSTALLED_APPS = [
     "accounts",
     "todos",
     "comments",
+    "calendars",
     "board",
 ]
 
@@ -25,6 +26,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "accounts.middleware.TimezoneMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
 
@@ -59,6 +61,13 @@ AUTHENTICATION_BACKENDS = [
 LOGIN_URL = "accounts:login"
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", "")
+# Calendars: Recall.ai syncs them; we run each provider's consent screen. Microsoft is optional;
+# Google reuses the sign-in client (add the calendar callback as a redirect URI there).
+MICROSOFT_CLIENT_ID = env("MICROSOFT_CLIENT_ID", "")
+MICROSOFT_CLIENT_SECRET = env("MICROSOFT_CLIENT_SECRET", "")
+RECALL_API_KEY = env("RECALL_API_KEY", "")
+RECALL_API_BASE = env("RECALL_API_BASE", "https://us-east-1.recall.ai").rstrip("/")
+RECALL_WEBHOOK_SECRET = env("RECALL_WEBHOOK_SECRET", "")
 SITE_URL = env("SITE_URL", "http://localhost:8000").rstrip("/")
 
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 365  # a guest's identity is this cookie

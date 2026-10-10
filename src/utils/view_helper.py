@@ -49,6 +49,12 @@ def close_overlay(response):
     return response
 
 
+def refresh_board(response):
+    """Ask the board, wherever the request came from, to reload itself once this response lands."""
+    response["HX-Trigger"] = '{"board-changed": {"target": "body"}}'
+    return response
+
+
 def retarget(response, selector, swap="outerHTML"):
     """Send a successful form response somewhere other than the form itself."""
     response["HX-Retarget"] = selector

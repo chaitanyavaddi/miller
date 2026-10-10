@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from accounts.services import IdentityService
 from todos.models import PositionDay, Todo
-from todos.schemas import ReviewPeriod, ReviewStatus, TodoTitleSchema, TodoReopenSchema, TodoReorderSchema
+from todos.schemas import ReviewPeriod, ReviewStatus, TodoReminderSchema, TodoReopenSchema, TodoReorderSchema, TodoTitleSchema
 from todos.services import InsightsService, PositionHistoryService, TodoService
 
 
@@ -166,3 +166,71 @@ class _Messages:
 
     def add(self, level, message, extra_tags=""):
         self.added.append(message)
+
+
+class TodoDayTests(TestCase):
+    """Todos are filed by day: ordered within it, moved between days, rolled forward when left behind."""
+
+    def setUp(self):
+        self.user = IdentityService.create_user("d@x.com", show_meetings=True)
+        self.today = timezone.localdate()
+        self.tomorrow = self.today + timedelta(days=1)
+        self.todos = [TodoService.create(self.user, TodoTitleSchema(title=f"todo {i}")) for i in (1, 2)]
+
+    def meeting(self, title, day, hour):
+        start = timezone.make_aware(timezone.datetime.combine(day, timezone.datetime.min.time())) + timedelta(hours=hour)
+        meeting = Todo.objects.create(user=self.user, kind=Todo.Kind.MEETING, title=title, day=day, starts_at=start, ends_at=start + timedelta(hours=1))
+        TodoService.slot_meeting(meeting)
+        return meeting
+
+    def day(self, day):
+        return list(TodoService.open_for(self.user).filter(day=day).values_list("title", flat=True))
+
+    def test_a_new_todo_goes_to_the_end_of_today(self):
+        TodoService.create(self.user, TodoTitleSchema(title="todo 3"))
+        self.assertEqual(self.day(self.today), ["todo 1", "todo 2", "todo 3"])
+
+    def test_unfinished_todos_from_past_days_roll_to_the_top_of_today(self):
+        Todo.objects.filter(pk=self.todos[1].pk).update(day=self.today - timedelta(days=2), position=1)
+        TodoService.roll_over(self.user)
+        self.assertEqual(self.day(self.today), ["todo 2", "todo 1"])
+
+    def test_reorder_moves_a_todo_to_the_day_it_was_dropped_in(self):
+        TodoService.reorder(self.user, TodoReorderSchema(ids=[self.todos[1].id, self.todos[0].id], days=[self.today.isoformat(), self.tomorrow.isoformat()]))
+        self.assertEqual((self.day(self.today), self.day(self.tomorrow)), (["todo 2"], ["todo 1"]))
+
+    def test_a_todo_dropped_in_later_goes_past_the_dated_days(self):
+        TodoService.reorder(self.user, TodoReorderSchema(ids=[self.todos[0].id], days=["later"]))
+        self.todos[0].refresh_from_db()
+        self.assertEqual(self.todos[0].day, TodoService.horizon_end() + timedelta(days=1))
+
+    def test_a_meeting_stays_on_its_day_whatever_the_order_says(self):
+        meeting = self.meeting("standup", self.today, 9)
+        TodoService.reorder(self.user, TodoReorderSchema(ids=[meeting.id, self.todos[0].id], days=[self.tomorrow.isoformat()] * 2))
+        meeting.refresh_from_db()
+        self.assertEqual(meeting.day, self.today)
+        self.assertEqual(self.day(self.tomorrow), ["todo 1"])
+
+    def test_meetings_slot_in_by_time_among_the_days_todos(self):
+        self.meeting("late", self.today, 15)
+        self.meeting("early", self.today, 9)
+        self.assertEqual(self.day(self.today), ["todo 1", "todo 2", "early", "late"])
+
+    def test_meetings_list_from_today_on_and_only_when_shown(self):
+        self.meeting("yesterday's", self.today - timedelta(days=1), 9)
+        self.meeting("today's", self.today, 9)
+        self.assertIn("today's", TodoService.listed_for(self.user).values_list("title", flat=True))
+        self.assertNotIn("yesterday's", TodoService.listed_for(self.user).values_list("title", flat=True))
+        self.user.show_meetings = False
+        self.assertNotIn("today's", TodoService.listed_for(self.user).values_list("title", flat=True))
+
+    def test_a_reminder_files_the_todo_under_the_day_it_fires(self):
+        remind_at = timezone.make_aware(timezone.datetime.combine(self.tomorrow, timezone.datetime.min.time())) + timedelta(hours=9)
+        TodoService.remind(self.todos[0], TodoReminderSchema(raw="x", remind_at=remind_at))
+        self.assertEqual((self.day(self.today), self.day(self.tomorrow)), (["todo 2"], ["todo 1"]))
+
+    def test_meetings_are_read_only_but_can_be_commented_on(self):
+        meeting = self.meeting("standup", self.today, 9)
+        self.assertTrue(self.user.has_perm("todos.comment_todo", meeting))
+        self.assertFalse(self.user.has_perm("todos.change_todo", meeting))
+        self.assertFalse(self.user.has_perm("todos.delete_todo", meeting))

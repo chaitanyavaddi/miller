@@ -1,0 +1,442 @@
+/* Standalone day-plan mock — not used by the product board. */
+.mock {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 28px 32px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.mock__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex: none;
+}
+
+.mock__brand {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.mock__badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mock__hint {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  min-height: calc(13px * 1.45);
+  flex: none;
+}
+
+.mock__board {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 56px;
+}
+
+.mock__left {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.mock__plan {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mock__day {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Day boundary — date + free time + rail + grip handle */
+.mock__stick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 18px;
+  margin: 2px 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: grab;
+  width: 100%;
+  text-align: left;
+  color: var(--text-4);
+  touch-action: none;
+  user-select: none;
+}
+
+.mock__stick:hover { color: var(--text-3); }
+.mock__stick:hover .mock__stick-handle { opacity: 1; color: var(--text-3); }
+.mock__stick:active { cursor: grabbing; }
+.mock__stick:focus-visible { outline: 1px dotted var(--text); outline-offset: 3px; }
+
+.mock__stick-day {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  white-space: nowrap;
+  flex: none;
+  color: var(--text-3);
+}
+
+.mock__stick-rail {
+  flex: 1 1 auto;
+  height: 0;
+  border-top: 1px dashed var(--border);
+  min-width: 12px;
+}
+
+.mock__stick-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  opacity: 0.45;
+  color: var(--text-4);
+}
+
+.mock__stick-handle--dot {
+  width: 4px;
+  height: 4px;
+  margin: 0 6px;
+  border-radius: 50%;
+  background: var(--text-3);
+  opacity: 1;
+}
+
+.mock__stick--static {
+  cursor: default;
+}
+
+.mock__stick--static:hover .mock__stick-handle { opacity: 1; }
+
+.mock__grip { display: block; }
+
+.mock__stick--dragging .mock__stick-day { color: var(--text); }
+.mock__stick--dragging .mock__stick-rail { border-top-color: var(--text-3); }
+.mock__stick--dragging .mock__stick-handle { opacity: 1; color: var(--text); }
+
+.mock__stick--today .mock__stick-day { color: var(--text); }
+
+/* Collapsed horizon */
+.mock__later {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 18px;
+  margin: 6px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-4);
+  font: inherit;
+  text-align: left;
+}
+
+.mock__later:hover { color: var(--text-3); }
+
+.mock__later-label,
+.mock__later-count {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  flex: none;
+}
+
+.mock__later-rail {
+  flex: 1 1 auto;
+  height: 0;
+  border-top: 1px dashed var(--border);
+  min-width: 12px;
+}
+
+.mock__later-hide {
+  align-self: flex-start;
+  margin: 0 0 4px 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--text-4);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.mock__later-hide:hover { color: var(--text); }
+
+.mock__items {
+  display: flex;
+  flex-direction: column;
+  min-height: 4px;
+  padding: 0 12px 0 0;
+  border-radius: 4px;
+  transition: background 0.12s ease;
+}
+
+.mock__items--over {
+  background: rgba(38, 37, 30, 0.04);
+}
+
+.mock__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  color: var(--text-3);
+  border-radius: 2px;
+}
+
+.mock__row--todo {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.mock__row--todo:active { cursor: grabbing; }
+.mock__row--todo:hover { color: var(--text); }
+.mock__row--todo:hover .mock__row-title { color: var(--text); }
+
+.mock__row--todo.mock__row--current .mock__row-title {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.mock__row--todo.mock__row--done {
+  cursor: default;
+}
+
+.mock__row--todo.mock__row--done .mock__row-title {
+  color: var(--text-4);
+  text-decoration: line-through;
+  text-decoration-color: var(--border);
+  font-weight: 400;
+}
+
+.mock__row--todo.mock__row--done .mock__row-meta {
+  color: var(--text-4);
+}
+
+/* Checkbox instead of order number */
+.mock__row-pos--check {
+  display: flex;
+  align-items: center;
+}
+
+.mock__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-4);
+}
+
+.mock__check:hover { color: var(--text); }
+.mock__check--on { color: var(--text); }
+.mock__check:focus-visible { outline: 1px dotted var(--text); outline-offset: 2px; }
+
+/* Meetings: quieter — calendar-fixed */
+.mock__row--meeting {
+  cursor: default;
+  color: var(--text-4);
+}
+
+.mock__row--meeting .mock__row-title {
+  font-weight: 400;
+  color: var(--text-4);
+}
+
+.mock__row--meeting .mock__row-meta--time {
+  color: var(--text-4);
+}
+
+.mock__row--meeting:hover .mock__row-title,
+.mock__row--meeting:hover .mock__row-meta--time {
+  color: var(--text-3);
+}
+
+.mock__row--meeting.mock__row--soon,
+.mock__row--meeting.mock__row--soon .mock__row-title,
+.mock__row--meeting.mock__row--soon .mock__row-meta--time {
+  color: var(--text-3);
+}
+
+.mock__row--meeting.mock__row--current .mock__row-title {
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+/* Reminders: time-fixed nudge — between todo energy and meeting quiet */
+.mock__row--reminder {
+  cursor: default;
+  color: var(--text-3);
+}
+
+.mock__row--reminder .mock__row-title {
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+.mock__row--reminder .mock__row-meta--time {
+  color: var(--text-4);
+}
+
+.mock__row--reminder:hover .mock__row-title,
+.mock__row--reminder:hover .mock__row-meta--time {
+  color: var(--text);
+}
+
+.mock__row--reminder.mock__row--current .mock__row-title {
+  color: var(--text);
+  font-weight: 400;
+}
+
+.mock__row-meta--time {
+  width: 44px;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.mock__row--dragging {
+  opacity: 0.35;
+}
+
+.mock__row--drop-before {
+  box-shadow: inset 0 2px 0 var(--text);
+}
+
+.mock__row-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 36px;
+}
+
+.mock__row-pos {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-4);
+  width: 44px;
+  flex: none;
+}
+
+.mock__row-title {
+  font-size: 13.5px;
+  letter-spacing: -0.01em;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mock__row-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-4);
+  width: 36px;
+  text-align: right;
+  flex: none;
+}
+
+.mock__row-trail {
+  width: 28px;
+  flex: none;
+}
+
+.mock__empty {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  font-size: 12.5px;
+  color: var(--text-4);
+  padding-left: 58px;
+}
+
+.mock__thread {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mock__crumb {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-4);
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  flex: none;
+}
+
+.mock__crumb b {
+  font-weight: 400;
+  color: var(--text);
+}
+
+.mock__thread-title {
+  margin: 20px 0 0;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  flex: none;
+}
+
+.mock__thread-body {
+  flex: 1 1 auto;
+  margin-top: 24px;
+  font-size: 13px;
+  color: var(--text-4);
+}
+
+.mock__thread-body p + p { margin-top: 4px; }
+.mock__thread-body strong { color: var(--text-3); font-weight: 500; }
+
+@media (max-width: 760px) {
+  .mock { padding: 20px; }
+  .mock__board { grid-template-columns: 1fr; }
+  .mock__thread { display: none; }
+}

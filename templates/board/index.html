@@ -14,7 +14,8 @@
 {% block content %}
 <c-layout.topbar :user="request.user" />
 <div class="page">
-  <c-board.workspace :rows="rows" :current="current" :comments="comments" :undo="undo" :done="done" :reopen_index="reopen_index" />
+  <c-board.workspace :rows="rows" :days="days" :today_label="today_label" :presets="presets" :current="current" :comments="comments" :undo="undo" :done="done" :reopen_index="reopen_index" />
 </div>
-<div id="overlay"></div>
+<div id="overlay"{% if request.GET.settings %} hx-get="{% url 'board:settings' %}" hx-trigger="load" hx-swap="innerHTML"{% endif %}></div>
+{% if not request.user.timezone %}<span hidden id="timezone-detect" data-url="{% url 'board:settings-timezone' %}"></span>{% endif %}
 {% endblock %}

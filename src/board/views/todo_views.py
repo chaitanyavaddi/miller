@@ -3,8 +3,9 @@ from django.views import View
 from accounts.mixins import SignedInRequiredMixin
 from board.mixins import BoardResponseMixin
 from board.services import BoardService
+from todos import reminders
 from todos.mixins import TodoPermissionRequiredMixin
-from todos.schemas import TodoTitleSchema, TodoReopenSchema, TodoReorderSchema
+from todos.schemas import TodoReminderSchema, TodoReopenSchema, TodoReorderSchema, TodoTitleSchema
 from todos.services import TodoService
 from utils.view_helper import close_overlay, render_fragment, retarget
 
@@ -23,9 +24,12 @@ class TodoListView(SignedInRequiredMixin, BoardResponseMixin, View):
 class TodoCreateView(SignedInRequiredMixin, BoardResponseMixin, View):
     def post(self, request):
         data = TodoTitleSchema.from_post(request)
-        if not data.is_valid():
-            return render_fragment(request, "todos.form", {"data": data})
-        TodoService.create(request.user, data)
+        reminder = TodoReminderSchema.from_post(request)
+        if not all([data.is_valid(), reminder.is_valid()]):
+            return render_fragment(request, "todos.form", {"data": data, "reminder": reminder, "presets": reminders.presets()})
+        todo = TodoService.create(request.user, data)
+        if reminder.remind_at is not None:
+            TodoService.remind(todo, reminder)
         return retarget(self.render_workspace(self.selected_id()), "#workspace")
 
 
@@ -45,6 +49,19 @@ class TodoRenameView(TodoPermissionRequiredMixin, View):
         if renamed:
             TodoService.rename(self.todo, data)
         return render_fragment(request, "todos.title-form", {"todo": self.todo, "renamed": renamed})
+
+
+class TodoRemindView(TodoPermissionRequiredMixin, BoardResponseMixin, View):
+    """Set or clear a reminder. The board comes back whole: the todo may now sit under another day."""
+    permission_required = "todos.change_todo"
+
+    def post(self, request, pk):
+        data = TodoReminderSchema.from_post(request)
+        if not data.is_valid():
+            row = BoardService.select(BoardService.rows(request.user), self.todo.id)
+            return retarget(render_fragment(request, "todos.reminder-form", {"row": row, "presets": reminders.presets()}), "#reminder")
+        TodoService.remind(self.todo, data)
+        return self.render_workspace(self.selected_id())
 
 
 class TodoCloseView(TodoPermissionRequiredMixin, BoardResponseMixin, View):

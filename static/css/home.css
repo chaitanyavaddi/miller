@@ -1,0 +1,45 @@
+/* Homepage concept — quiet entry, product lives at /. */
+.home {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+}
+
+.home__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+}
+
+.home__brand {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.home__cta {
+  padding: 8px 0;
+  color: var(--text);
+}
+
+.home__line {
+  margin: 36px 0 0;
+  max-width: 36ch;
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  color: var(--text);
+}
+
+@media (max-width: 760px) {
+  .home { padding: 20px; }
+  .home__line { margin-top: 28px; font-size: 16px; }
+}

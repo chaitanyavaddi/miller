@@ -19,11 +19,12 @@
         <span class="eyebrow">Shortcuts</span>
         <c-layout.shortcuts />
       </div>
-      {% if not user.is_guest %}
       <div class="account-menu__section">
+        <c-ui.text-button class="account-menu__action" data-action="menu-close" hx-get="{% url 'board:settings' %}" hx-target="#overlay" hx-swap="innerHTML">Settings</c-ui.text-button>
+        {% if not user.is_guest %}
         <c-ui.text-button class="account-menu__action" hx-post="{% url 'accounts:logout' %}" hx-swap="none">Log out</c-ui.text-button>
+        {% endif %}
       </div>
-      {% endif %}
     </div>
   </div>
 </header>

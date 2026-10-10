@@ -1,0 +1,68 @@
+<c-vars user zones current_zone connections suggested providers notice="" />
+<div class="overlay">
+  <button type="button" class="overlay__scrim" aria-label="Close settings" data-action="overlay-close"></button>
+  <div class="settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="settings__bar">
+      <span class="eyebrow" id="settings-title">Settings</span>
+      <c-ui.icon-button label="Close settings" title="Close" class="icon-btn--small" data-action="overlay-close"><c-ui.icon name="x" size="14" /></c-ui.icon-button>
+    </div>
+    {% if notice %}<p class="settings__notice" role="status">{{ notice }}</p>{% endif %}
+    <c-ui.messages />
+
+    <section class="settings__section" aria-labelledby="settings-zone">
+      <h2 class="settings__heading" id="settings-zone">Time zone</h2>
+      <p class="settings__hint">Your days begin and end here, and meetings and reminders show in it.</p>
+      <form hx-post="{% url 'board:settings-timezone' %}" hx-trigger="change" hx-target="#overlay" hx-swap="innerHTML">
+        {% csrf_token %}
+        <select class="settings__select" name="timezone" aria-label="Time zone">
+          {% for zone in zones %}<option value="{{ zone }}"{% if zone == current_zone %} selected{% endif %}>{{ zone }}</option>{% endfor %}
+        </select>
+      </form>
+    </section>
+
+    <section class="settings__section" aria-labelledby="settings-meetings">
+      <h2 class="settings__heading" id="settings-meetings">Meetings</h2>
+      {% if user.is_guest %}
+      <p class="settings__hint">Sign in to bring meetings from your calendars into the list.</p>
+      <a class="text-btn settings__action" href="{% url 'accounts:login' %}">Sign in</a>
+      {% else %}
+      <form hx-post="{% url 'board:settings-meetings' %}" hx-trigger="change" hx-target="#overlay" hx-swap="innerHTML">
+        {% csrf_token %}
+        <label class="settings__toggle">
+          <input type="checkbox" name="show_meetings" value="1"{% if user.show_meetings %} checked{% endif %}>
+          <span>List meetings from my calendars among my todos</span>
+        </label>
+      </form>
+      {% if user.show_meetings %}
+      <p class="settings__hint">Read only: they come and go with your calendar. Drag one within its day to place it among your todos.</p>
+      {% if connections %}
+      <ul class="settings__calendars">
+        {% for connection in connections %}
+        <li class="settings__calendar">
+          <span class="settings__calendar-email">{{ connection.email }}</span>
+          <span class="settings__calendar-meta">{{ connection.get_provider_display }}{% if connection.status != "connected" %} · {{ connection.get_status_display|lower }}{% endif %}</span>
+          <c-ui.text-button class="text-btn--small settings__calendar-action" hx-post="{% url 'board:settings-disconnect' connection.id %}" hx-target="#overlay" hx-swap="innerHTML">Disconnect</c-ui.text-button>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      {% if suggested %}
+      <a class="settings__suggest" href="{% url 'calendars:connect' 'google' %}?hint={{ suggested|urlencode }}">
+        <c-ui.icon name="calendar" size="14" sw="1.6" />
+        <span class="settings__suggest-text">Connect <b>{{ suggested }}</b></span>
+        <span class="settings__suggest-meta">Google Calendar</span>
+      </a>
+      {% endif %}
+      {% if providers %}
+      <p class="settings__more">
+        <span class="settings__more-label">{% if connections or suggested %}Add another{% else %}Connect a calendar{% endif %}</span>
+        {% for value, label in providers %}<a class="text-btn text-btn--small" href="{% url 'calendars:connect' value %}">{{ label }}</a>{% endfor %}
+      </p>
+      {% else %}
+      <p class="settings__hint">Calendar connections aren’t set up on this server yet.</p>
+      {% endif %}
+      {% endif %}
+      {% endif %}
+    </section>
+  </div>
+</div>

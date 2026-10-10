@@ -1,14 +1,25 @@
-<c-vars current comments focus="" />
+<c-vars current comments presets="" focus="" />
 <article class="board__pane thread" id="thread" aria-label="Thread">
 {% if current %}
   <div class="pane-bar">
-    <span class="thread__crumb"><b class="thread__crumb-strong">#{{ current.position }} today</b> · {{ current.days_on_list }}</span>
+    {% if current.is_meeting %}
+    <span class="thread__crumb"><b class="thread__crumb-strong">Meeting</b> · {{ current.day_name }}{% if current.span %} · {{ current.span }}{% endif %}</span>
+    {% if current.meeting_url %}<a class="text-btn text-btn--small thread__join" href="{{ current.meeting_url }}" target="_blank" rel="noopener">Join</a>{% endif %}
+    {% else %}
+    <span class="thread__crumb"><b class="thread__crumb-strong">#{{ current.position }} {{ current.day_name }}</b> · {{ current.days_on_list }}</span>
     <c-ui.icon-button label="Mark done" title="Mark done" class="icon-btn--small thread__done" hx-post="{% url 'board:todo-close' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML"><c-ui.icon name="check" size="14" sw="1.8" /></c-ui.icon-button>
+    {% endif %}
   </div>
   <div class="thread__heading">
+    {% if current.is_meeting %}
+    <h1 class="thread__title" title="From your calendar · read only">{{ current.title }}</h1>
+    {% else %}
     <c-todos.title-form :todo="current" />
+    {% if not current.remind_label %}<c-ui.icon-button label="Remind me" title="Remind me" class="icon-btn--small icon-btn--quiet" data-action="remind-open" data-remind-for="remind-form" aria-haspopup="menu"><c-ui.icon name="bell" size="14" sw="1.6" /></c-ui.icon-button>{% endif %}
     <c-ui.icon-button label="Delete todo" title="Delete" class="icon-btn--small icon-btn--quiet" hx-post="{% url 'board:todo-delete' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML"><c-ui.icon name="trash" size="14" sw="1.6" /></c-ui.icon-button>
+    {% endif %}
   </div>
+  {% if not current.is_meeting %}<c-todos.reminder-form :row="current" :presets="presets" />{% endif %}
   <div class="thread__comments">
     {% for comment in comments %}<c-comments.comment :comment="comment" />{% empty %}
     <div class="thread__empty">

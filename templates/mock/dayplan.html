@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Day plan mock · Miller{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/mock-dayplan.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/mock-dayplan.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<main class="mock" id="dayplan-mock">
+  <header class="mock__top">
+    <h1 class="mock__brand"><c-ui.logo /></h1>
+    <span class="mock__badge">Mock · not product</span>
+  </header>
+  <p class="mock__hint" aria-hidden="true"></p>
+
+  <div class="mock__board">
+    <div class="mock__left">
+      <div class="mock__plan" data-plan></div>
+    </div>
+    <aside class="mock__thread" data-thread></aside>
+  </div>
+</main>
+{% endblock %}

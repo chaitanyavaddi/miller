@@ -1,11 +1,17 @@
 import tempfile
+from datetime import datetime, time, timedelta
+from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
-from accounts.services import IdentityService
+from accounts.services import GuestService, IdentityService, PreferenceService
+from calendars.models import CalendarConnection
+from calendars.services import RecallService
 from comments.models import Comment
+from todos.models import Todo
 from todos.schemas import TodoTitleSchema
 from todos.services import TodoService
 
@@ -228,3 +234,165 @@ class BoardTests(TestCase):
         self.assertEqual(self.client.get(self.url("review-thread", self.todos[0])).status_code, 403)
         self.assertEqual(self.client.post(self.url("review-delete", self.todos[0])).status_code, 403)
         self.assertNotContains(self.client.get(self.url("review"), {"period": "all", "status": "open"}), "todo 1")
+
+
+class DayBoardTests(TestCase):
+    def setUp(self):
+        self.user = IdentityService.create_user("d@x.com", name="Dee", show_meetings=True, timezone="UTC")
+        self.client.force_login(self.user)
+        self.today = timezone.localdate()
+        self.todo = TodoService.create(self.user, TodoTitleSchema(title="write the plan"))
+
+    def meeting(self, day, title="Hiring panel"):
+        start = timezone.make_aware(datetime.combine(day, time(10)))
+        meeting = Todo.objects.create(user=self.user, kind=Todo.Kind.MEETING, title=title, day=day, starts_at=start,
+                                      ends_at=start + timedelta(hours=1), meeting_url="https://zoom.us/j/1")
+        TodoService.slot_meeting(meeting)
+        return meeting
+
+    def test_the_list_heads_with_today_and_labels_the_coming_days(self):
+        TodoService.move_to_day(self.todo, self.today + timedelta(days=2))
+        page = self.client.get(reverse("board:index"))
+        self.assertContains(page, f"Todos · {self.today:%a}, {self.today:%b} {self.today.day}")
+        day = self.today + timedelta(days=2)
+        self.assertContains(page, f'<span class="day__label">{f"{day:%a}, {day:%b} {day.day}".lower()}</span>')
+
+    def test_todos_past_the_week_fold_into_later_with_a_count(self):
+        TodoService.move_to_day(self.todo, self.today + timedelta(days=30))
+        page = self.client.get(reverse("board:index"))
+        self.assertContains(page, "<span data-later-count>1 todo</span>")
+        self.assertContains(page, 'data-action="later-toggle"')
+
+    def test_a_meeting_shows_its_time_and_a_read_only_thread(self):
+        meeting = self.meeting(self.today)
+        page = self.client.get(f"{reverse('board:index')}?t={meeting.id}")
+        self.assertContains(page, "10:00a")
+        self.assertContains(page, "Meeting</b> · today · 10:00a – 11:00a")
+        self.assertContains(page, 'href="https://zoom.us/j/1"')
+        self.assertNotContains(page, 'aria-label="Todo title"')   # no rename
+        self.assertNotContains(page, 'aria-label="Delete todo"')
+        self.assertContains(page, 'id="comment-input"')            # notes still welcome
+
+    def test_a_meeting_cannot_be_closed_or_renamed(self):
+        meeting = self.meeting(self.today)
+        self.assertEqual(self.client.post(reverse("board:todo-close", args=[meeting.id])).status_code, 403)
+        self.assertEqual(self.client.post(reverse("board:todo-rename", args=[meeting.id]), {"title": "x"}).status_code, 403)
+
+    def test_setting_a_reminder_shows_it_on_the_row_and_files_it_under_its_day(self):
+        tomorrow = self.today + timedelta(days=1)
+        response = self.client.post(reverse("board:todo-remind", args=[self.todo.id]), {"remind_at": f"{tomorrow.isoformat()}T09:30", "t": self.todo.id})
+        self.assertContains(response, "9:30a")
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.day, tomorrow)
+        response = self.client.post(reverse("board:todo-remind", args=[self.todo.id]), {"remind_at": ""})
+        self.todo.refresh_from_db()
+        self.assertIsNone(self.todo.remind_at)
+
+    def test_a_garbled_reminder_is_refused_with_a_message(self):
+        response = self.client.post(reverse("board:todo-remind", args=[self.todo.id]), {"remind_at": "soon"})
+        self.assertContains(response, "isn&#x27;t a date and time")
+        self.assertEqual(response["HX-Retarget"], "#reminder")
+
+
+@override_settings(RECALL_API_KEY="key", GOOGLE_CLIENT_ID="id", GOOGLE_CLIENT_SECRET="secret")
+class SettingsTests(TestCase):
+    def setUp(self):
+        self.user = IdentityService.create_user("s@x.com", name="Sam")
+        self.client.force_login(self.user)
+
+    def test_the_account_menu_opens_settings(self):
+        self.assertContains(self.client.get(reverse("board:index")), f'hx-get="{reverse("board:settings")}"')
+
+    def test_turning_meetings_on_suggests_the_signed_in_calendar(self):
+        self.assertNotContains(self.client.get(reverse("board:settings")), "Connect <b>s@x.com</b>")
+        response = self.client.post(reverse("board:settings-meetings"), {"show_meetings": "1"})
+        self.assertContains(response, "Connect <b>s@x.com</b>")
+        self.assertContains(response, "hint=s%40x.com")
+        self.assertIn("board-changed", response["HX-Trigger"])
+
+    def test_choosing_a_time_zone_saves_it_and_refreshes_the_board(self):
+        response = self.client.post(reverse("board:settings-timezone"), {"timezone": "Asia/Kolkata"})
+        self.assertContains(response, '<option value="Asia/Kolkata" selected>')
+        self.assertIn("board-changed", response["HX-Trigger"])
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.timezone, "Asia/Kolkata")
+
+    def test_the_browsers_zone_fills_in_but_never_overrides_a_choice(self):
+        self.client.post(reverse("board:settings-timezone"), {"timezone": "Europe/Berlin", "detected": "1"})
+        self.client.post(reverse("board:settings-timezone"), {"timezone": "Asia/Tokyo", "detected": "1"})
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.timezone, "Europe/Berlin")
+
+    def test_an_unknown_zone_is_refused(self):
+        self.assertContains(self.client.post(reverse("board:settings-timezone"), {"timezone": "Mars/Base"}), "Pick a time zone from the list")
+
+    def test_guests_are_asked_to_sign_in_for_calendars(self):
+        self.client.force_login(GuestService.create_guest())
+        response = self.client.get(reverse("board:settings"))
+        self.assertContains(response, "Sign in to bring meetings")
+        self.assertNotContains(response, 'name="show_meetings"')
+
+    @patch.object(RecallService, "delete_calendar")
+    def test_disconnecting_a_calendar_says_so(self, delete_calendar):
+        PreferenceService.set_show_meetings(self.user, True)
+        connection = CalendarConnection.objects.create(user=self.user, provider="google", email="s@x.com", recall_id="cal-1")
+        response = self.client.post(reverse("board:settings-disconnect", args=[connection.id]))
+        self.assertContains(response, "Disconnected s@x.com.")
+        self.assertFalse(CalendarConnection.objects.exists())
+
+
+class ReminderAndReorderTests(TestCase):
+    def setUp(self):
+        self.user = IdentityService.create_user("r@x.com", timezone="UTC")
+        self.client.force_login(self.user)
+        self.todo = TodoService.create(self.user, TodoTitleSchema(title="call the bank"))
+
+    def test_the_composer_offers_the_presets_with_pick_a_time_last(self):
+        page = self.client.get(reverse("board:index")).content.decode()
+        self.assertIn('data-remind-preset="hour"', page)
+        self.assertIn('data-remind-preset="tomorrow"', page)
+        self.assertLess(page.index('data-remind-preset="tomorrow"'), page.index("Pick a time…"))
+
+    def test_adding_a_todo_with_a_preset_sets_its_reminder(self):
+        self.client.post(reverse("board:todo-create"), {"title": "pay rent", "remind_preset": "tomorrow"})
+        todo = Todo.objects.get(title="pay rent")
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        self.assertEqual((todo.day, timezone.localtime(todo.remind_at).time()), (tomorrow, time(9)))
+
+    def test_a_reminder_in_the_past_is_refused_and_the_todo_is_not_added(self):
+        response = self.client.post(reverse("board:todo-create"), {"title": "too late", "remind_at": "2020-01-01T09:00"})
+        self.assertContains(response, "Pick a time that hasn")
+        self.assertFalse(Todo.objects.filter(title="too late").exists())
+
+    def test_the_thread_shows_a_reminder_line_only_once_there_is_one(self):
+        page = self.client.get(reverse("board:index"))
+        self.assertNotContains(page, 'type="datetime-local" class="reminder')
+        self.assertNotContains(page, "reminder__when")
+        self.assertContains(page, 'data-remind-for="remind-form"')       # the bell by the title
+        self.client.post(reverse("board:todo-remind", args=[self.todo.id]), {"remind_preset": "tomorrow"})
+        page = self.client.get(reverse("board:index"))
+        self.assertContains(page, "Tomorrow · 9:00a")
+        self.assertNotContains(page, 'data-remind-for="remind-form"')
+
+    def test_the_next_five_days_and_later_are_there_to_drop_onto(self):
+        page = self.client.get(reverse("board:index")).content.decode()
+        for offset in range(1, 6):
+            self.assertIn(f'data-day="{(timezone.localdate() + timedelta(days=offset)).isoformat()}"', page)
+        self.assertIn('data-day="later"', page)
+        self.assertIn('data-action="reorder-start"', page)
+
+
+class RowAgeTests(TestCase):
+    def setUp(self):
+        self.user = IdentityService.create_user("age@x.com")
+        self.client.force_login(self.user)
+
+    def test_a_row_shows_its_age_only_from_two_days_on(self):
+        fresh = TodoService.create(self.user, TodoTitleSchema(title="fresh"))
+        old = TodoService.create(self.user, TodoTitleSchema(title="old"))
+        Todo.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(days=3))
+        Todo.objects.filter(pk=fresh.pk).update(created_at=timezone.now() - timedelta(days=1))
+        page = self.client.get(reverse("board:index")).content.decode()
+        self.assertIn('title="3 days on list">3d</span>', page)
+        self.assertNotIn(">1d</span>", page)
+        self.assertNotIn(">0d</span>", page)

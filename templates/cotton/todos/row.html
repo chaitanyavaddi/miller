@@ -1,15 +1,24 @@
 <c-vars row current="" />
-<div class="todo-row{% if row.id == current %} todo-row--current{% endif %}" data-id="{{ row.id }}">
-  <span class="todo-row__grip" draggable="true" title="Drag to reorder"><c-ui.icon name="grip" size="12" /></span>
+<div class="todo-row{% if row.is_meeting %} todo-row--meeting{% endif %}{% if row.id == current %} todo-row--current{% endif %}" data-id="{{ row.id }}" data-kind="{{ row.kind }}" data-day="{{ row.bucket }}" draggable="true">
   <button type="button" class="todo-row__main" hx-get="{% url 'board:todo-detail' row.id %}" hx-target="#thread" hx-swap="outerHTML" hx-sync="#rows:replace" hx-preload="mouseover">
     <span class="todo-row__pos">{{ row.position|pad2 }}</span>
     <span id="todo-title-{{ row.id }}" class="todo-row__title">{{ row.title }}</span>
-    <span class="todo-row__age" title="Time since created">{{ row.age }}d</span>
+    {% if row.is_meeting %}
+    <span class="todo-row__when" title="From your calendar · read only">{% if row.when %}<c-ui.icon name="calendar" size="12" sw="1.6" />{{ row.when }}{% endif %}</span>
+    {% elif row.when %}
+    <span class="todo-row__when" title="Reminder"><c-ui.icon name="bell" size="12" sw="1.6" />{{ row.when }}</span>
+    {% else %}
+    <span class="todo-row__age"{% if row.shows_age %} title="{{ row.days_on_list|capfirst }}">{{ row.age }}d{% else %}>{% endif %}</span>
+    {% endif %}
   </button>
   <span class="todo-row__actions">
+    {% if row.is_meeting %}
+    <span class="todo-row__action" aria-hidden="true"></span>
+    {% else %}
     <button type="button" class="todo-row__action" aria-label="Close {{ row.title }}" title="Mark done"
             hx-post="{% url 'board:todo-close' row.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML">
       <c-ui.icon name="check" size="14" sw="1.8" />
     </button>
+    {% endif %}
   </span>
 </div>

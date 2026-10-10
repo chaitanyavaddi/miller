@@ -14,26 +14,22 @@
 .todo-list__search-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }  /* our x clears and closes */
 .todo-list__search-input { flex: 1 1 auto; min-width: 0; height: 20px; border: none; outline: none; background: transparent; padding: 0; font: inherit; font-size: 13px; color: var(--text); }
 
-/* — rows. The grip lives in a 24px left gutter inside the scroll container (overflow would clip it). — */
-.todo-list__rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; margin: 24px 0 0 -24px; padding: 0 12px 0 24px; display: flex; flex-direction: column;
+/* — rows. A 24px left gutter inside the scroll container keeps the drop line clear of the edge. — */
+.todo-list__rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 24px 0 0 -24px; padding: 0 12px 0 24px; display: flex; flex-direction: column;
   scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .todo-list__rows::-webkit-scrollbar { width: 4px; }
 .todo-list__rows::-webkit-scrollbar-track { background: transparent; }
 .todo-list__rows::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-.todo-list__rows--drop-end::after { content: ""; height: 2px; background: var(--text); }
 .todo-list__empty { height: 36px; display: flex; align-items: center; font-size: 13px; color: var(--text-4); }
 .todo-list__empty--nomatch { padding-left: 58px; }
-/* Nothing in the list: the composer takes the first row's place, right under the heading. */
-.todo-list__rows:not(:has(*)) + .todo-form .composer { margin-top: 0; }
+/* The composer sits at the foot of the list, level with the comment box at the foot of the thread. */
+.todo-form { flex: none; }
 
 .todo-row { position: relative; display: flex; align-items: center; gap: 8px; }
-.todo-row__grip { position: absolute; left: -24px; top: 0; width: 24px; height: 36px; display: flex; align-items: center; color: var(--text-4); cursor: grab; opacity: 0; }
-.todo-row:hover .todo-row__grip { opacity: 1; }
-.todo-row__grip:hover { color: var(--text); }
-.todo-list--searching .todo-row__grip { display: none; }
 .todo-row__main { flex: 1 1 auto; min-width: 0; height: 36px; background: none; border: none; padding: 0; display: flex; align-items: center; gap: 14px; text-align: left; color: inherit; cursor: pointer; }
 .todo-row__pos { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-4); width: 44px; flex: none; }
 .todo-row__title { font-size: 13.5px; font-weight: 400; color: var(--text-3); flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
+.todo-row__when { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); min-width: 36px; flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .todo-row__age { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); width: 36px; text-align: right; flex: none; }
 .todo-row:hover .todo-row__title { color: var(--text); }
 .todo-row--current .todo-row__pos, .todo-row--current .todo-row__title { color: var(--text); }
@@ -42,11 +38,50 @@
 .todo-row__action { opacity: 0; width: 28px; height: 36px; background: none; border: none; padding: 0; cursor: pointer; color: var(--text-3); display: flex; align-items: center; justify-content: flex-end; }
 .todo-row:hover .todo-row__action, .todo-row:focus-within .todo-row__action { opacity: 1; }
 .todo-row__action:hover { color: var(--text); }
+.todo-row { transition: opacity 0.15s ease; }
 .todo-row--dragging { opacity: 0.3; }
-.todo-row--drop-before::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; background: var(--text); }
+/* Where a dragged todo will land: one thin, muted line, never a block. */
+.todo-row--drop-before::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--text-4); animation: drop-mark 0.12s ease-out; }
+@keyframes drop-mark { from { opacity: 0; transform: scaleX(0.96); } }
+
+/* — days: today's todos sit right under the list heading; another day gets a quiet label, and only
+     when something is in it. Past the next five days, everything folds into "later". — */
+.day { display: flex; flex-direction: column; }
+.day__head { height: 34px; margin-top: 14px; display: flex; align-items: center; gap: 14px; }
+.day__label { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }
+.day__rows { display: flex; flex-direction: column; }
+.day:not(.day--today):not(:has(.todo-row)) { display: none; }
+.day--later .day__rows { display: none; }
+.day--later.day--open .day__rows { display: flex; }
+.day:not(.day--today) .todo-row__title { color: var(--text-4); }
+.day:not(.day--today) .todo-row:hover .todo-row__title,
+.day:not(.day--today) .todo-row--current .todo-row__title { color: var(--text); }
+.day--drop-end .day__rows:has(.todo-row)::after { content: ""; height: 1px; background: var(--text-4); animation: drop-mark 0.12s ease-out; }
+.day--refused { opacity: 0.4; }
+
+/* — moving todos: hold a row and drag it. While a todo is being dragged, and throughout reorder mode
+     (the pencil), the next few days and later appear as faint, empty drop targets; they go again
+     once the drop (or, in reorder mode, the tick) has saved. — */
+.todo-list__reorder-hint, .todo-list__reorder-done { display: none; }
+.todo-list--reordering .todo-list__reorder-hint { display: inline; margin-right: auto; font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }
+.todo-list--reordering .todo-list__reorder-done { display: flex; margin-right: 36px; }
+.todo-list--reordering .todo-list__label,
+.todo-list--reordering .todo-list__reorder-start,
+.todo-list--reordering .todo-list__search-toggle { display: none; }
+.todo-list__reorder-start { margin-right: 4px; }
+#list:is(.todo-list--reordering, .todo-list--dragging) .day { display: flex; }  /* outranks the empty-day rule above */
+:is(.todo-list--reordering, .todo-list--dragging) .day--later .day__rows { display: flex; }
+:is(.todo-list--reordering, .todo-list--dragging) .day:not(:has(.todo-row)) .day__label { opacity: 0.55; }
+:is(.todo-list--reordering, .todo-list--dragging) .day:not(:has(.todo-row)) { animation: day-in 0.18s ease-out; }
+@keyframes day-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .todo-row, .todo-row--drop-before::before, .day--drop-end .day__rows::after, .day { transition: none; animation: none; } }
+:is(.todo-list--reordering, .todo-list--dragging) .day__rows:not(:has(.todo-row))::after { content: ""; height: 30px; margin-left: 58px; border-bottom: 1px dotted var(--border); }
+:is(.todo-list--reordering, .todo-list--dragging) .day--drop-end .day__rows:not(:has(.todo-row))::after { border-bottom: 1px solid var(--text-4); }
+.todo-list--reordering .todo-form { display: none; }
+.todo-list--reordering .todo-row__action { visibility: hidden; }  /* one tick on screen: the one that saves */
 
 /* — done rows: the last few closed todos end the list, quieter than the active ones — */
-.todo-row:not(.todo-row--done) + .todo-row--done { margin-top: 8px; }
+.day + .todo-row--done { margin-top: 8px; }
 .todo-row--done .todo-row__main { height: 30px; cursor: default; }
 .todo-row--done .todo-row__pos { color: var(--text-4); display: flex; align-items: center; }
 .todo-row--done .todo-row__title { color: var(--text-4); text-decoration: line-through; text-decoration-color: var(--border); }
@@ -56,5 +91,4 @@
 @media (max-width: 760px) {
   .todo-list__rows { overflow: visible; margin-left: 0; padding-left: 0; }
   .todo-row__action { opacity: 1; }
-  .todo-row__grip { display: none; } /* HTML5 drag-and-drop does not fire on touch */
 }
