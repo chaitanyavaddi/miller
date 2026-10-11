@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Not found · Miller{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/home.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="home">
+  <c-site.nav />
+
+  <main class="home__hero">
+    <h1 class="home__title">Nothing here.<span class="home__title-more">This page doesn't exist, or it moved.</span></h1>
+    <a class="text-btn home__try" href="{% url 'board:home' %}">Back to Miller</a>
+  </main>
+
+  <c-site.footer />
+</div>
+{% endblock %}

@@ -411,3 +411,11 @@ class SignInPageTests(TestCase):
     @override_settings(GOOGLE_CLIENT_ID="id", GOOGLE_CLIENT_SECRET="secret")
     def test_the_logo_leads_home(self):
         self.assertContains(self.client.get(reverse("accounts:login")), f'class="signin__home" href="{reverse("board:home")}"')
+
+
+class NotFoundPageTests(TestCase):
+    def test_a_missing_page_looks_like_the_home_page(self):
+        response = self.client.get("/no-such-page/")
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "Nothing here.", status_code=404)
+        self.assertContains(response, f'href="{reverse("board:home")}"', status_code=404)
