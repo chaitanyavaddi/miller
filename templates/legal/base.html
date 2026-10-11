@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{# A legal page: the home page's column and two-tone heading, then numbered sections whose numbers
+   hang in the margin like a todo's position, so every line starts on the logo's edge. #}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/home.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="home">
+  <c-site.nav />
+
+  <main class="legal">
+    <h1 class="home__title">{% block heading %}{% endblock %}<span class="home__title-more">{% block more %}{% endblock %}</span></h1>
+    <div class="legal__sections">{% block sections %}{% endblock %}</div>
+    <p class="eyebrow legal__updated">Updated October 11, 2026</p>
+  </main>
+
+  <c-site.footer />
+</div>
+{% endblock %}

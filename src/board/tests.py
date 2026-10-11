@@ -8,8 +8,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.services import GuestService, IdentityService, PreferenceService
-from calendars.models import CalendarConnection
-from calendars.services import RecallService
+from calendars.models import CalendarConnection, CalendarSource
+from calendars.services import CalendarApiError, CalendarService, TokenVault
 from comments.models import Comment
 from todos.models import Todo
 from todos.schemas import TodoTitleSchema
@@ -289,7 +289,7 @@ class MeetingBoardTests(TestCase):
         self.assertEqual(self.client.post(reverse("board:todo-rename", args=[self.meeting.id]), {"title": "x"}).status_code, 403)
 
 
-@override_settings(RECALL_API_KEY="key", GOOGLE_CLIENT_ID="id", GOOGLE_CLIENT_SECRET="secret")
+@override_settings(CALENDAR_TOKEN_KEY="aZ6JYqxxDyvXKY1bDSL0iZ3cN3g9cRQX9hX0_9gXQGQ=", GOOGLE_CLIENT_ID="id", GOOGLE_CLIENT_SECRET="secret")
 class SettingsTests(TestCase):
     def setUp(self):
         self.user = IdentityService.create_user("s@x.com", name="Sam")
@@ -332,13 +332,35 @@ class SettingsTests(TestCase):
         self.assertContains(response, "Sign in to bring meetings")
         self.assertNotContains(response, 'name="show_meetings"')
 
-    @patch.object(RecallService, "delete_calendar")
-    def test_disconnecting_a_calendar_says_so(self, delete_calendar):
+    @patch.object(CalendarService, "access_token", side_effect=CalendarApiError("down"))
+    def test_disconnecting_a_calendar_says_so(self, access_token):
         PreferenceService.set_show_meetings(self.user, True)
-        connection = CalendarConnection.objects.create(user=self.user, provider="google", email="s@x.com", recall_id="cal-1")
+        connection = CalendarConnection.objects.create(user=self.user, provider="google", email="s@x.com", refresh_token=TokenVault.seal("r"))
         response = self.client.post(reverse("board:settings-disconnect", args=[connection.id]))
         self.assertContains(response, "Disconnected s@x.com.")
         self.assertFalse(CalendarConnection.objects.exists())
+
+    def test_an_account_with_several_calendars_lists_each_with_a_switch(self):
+        PreferenceService.set_show_meetings(self.user, True)
+        connection = CalendarConnection.objects.create(user=self.user, provider="google", email="s@x.com", refresh_token=TokenVault.seal("r"))
+        CalendarSource.objects.create(connection=connection, external_id="p", name="Sam", is_primary=True, enabled=True)
+        family = CalendarSource.objects.create(connection=connection, external_id="f", name="Family")
+        response = self.client.get(reverse("board:settings"))
+        self.assertContains(response, "Family")
+        self.assertContains(response, reverse("board:settings-source", args=[family.id]))
+
+    def test_an_account_that_lost_access_offers_a_reconnect(self):
+        PreferenceService.set_show_meetings(self.user, True)
+        CalendarConnection.objects.create(user=self.user, provider="google", email="s@x.com", refresh_token="x", status="disconnected")
+        response = self.client.get(reverse("board:settings"))
+        self.assertContains(response, "lost access")
+        self.assertContains(response, reverse("calendars:connect", args=["google"]) + "?hint=s%40x.com")
+
+    def test_someone_elses_calendar_cant_be_switched(self):
+        other = IdentityService.create_user("o@x.com")
+        connection = CalendarConnection.objects.create(user=other, provider="google", email="o@x.com", refresh_token="x")
+        source = CalendarSource.objects.create(connection=connection, external_id="p", name="Theirs")
+        self.assertEqual(self.client.post(reverse("board:settings-source", args=[source.id]), {"enabled": "1"}).status_code, 403)
 
 
 class RowAgeTests(TestCase):
@@ -355,3 +377,37 @@ class RowAgeTests(TestCase):
         self.assertIn('title="3 days on list">3d</span>', page)
         self.assertIn('title="1 day on list">1d</span>', page)
         self.assertNotIn(">0d</span>", page)
+
+
+class HomeTests(TestCase):
+    def test_visitors_get_the_home_page_with_a_preview_and_a_way_in(self):
+        response = self.client.get("/")
+        self.assertContains(response, "Today, in order.")
+        self.assertContains(response, f'href="{reverse("board:index")}"')
+        self.assertContains(response, reverse("accounts:login"))
+
+    def test_members_go_straight_to_their_list(self):
+        self.client.force_login(IdentityService.create_user("m@x.com"))
+        self.assertRedirects(self.client.get("/"), reverse("board:index"), fetch_redirect_response=False)
+
+    def test_the_old_home_address_moves_to_the_root(self):
+        self.assertRedirects(self.client.get("/home/"), "/", status_code=301, fetch_redirect_response=False)
+
+
+class LegalPageTests(TestCase):
+    def test_the_home_page_links_to_privacy_and_terms(self):
+        response = self.client.get("/")
+        self.assertContains(response, f'href="{reverse("privacy")}"')
+        self.assertContains(response, f'href="{reverse("terms")}"')
+
+    def test_privacy_states_the_google_limited_use_commitment(self):
+        self.assertContains(self.client.get(reverse("privacy")), "including the Limited Use requirements")
+
+    def test_terms_are_public(self):
+        self.assertEqual(self.client.get(reverse("terms")).status_code, 200)
+
+
+class SignInPageTests(TestCase):
+    @override_settings(GOOGLE_CLIENT_ID="id", GOOGLE_CLIENT_SECRET="secret")
+    def test_the_logo_leads_home(self):
+        self.assertContains(self.client.get(reverse("accounts:login")), f'class="signin__home" href="{reverse("board:home")}"')

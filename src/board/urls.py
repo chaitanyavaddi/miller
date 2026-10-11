@@ -3,11 +3,13 @@ from django.urls import path
 from board.views import (
     BoardView,
     BoardWorkspaceView,
+    HomeView,
     CommentCreateView,
     ReviewDeleteView,
     ReviewThreadView,
     ReviewView,
     SettingsCalendarDisconnectView,
+    SettingsCalendarSourceView,
     SettingsMeetingsView,
     SettingsTimezoneView,
     SettingsView,
@@ -24,7 +26,8 @@ from board.views import (
 app_name = "board"
 
 urlpatterns = [
-    path("",                          BoardView.as_view(),         name="index"),
+    path("",                          HomeView.as_view(),          name="home"),
+    path("app/",                      BoardView.as_view(),         name="index"),
     path("board/",                    BoardWorkspaceView.as_view(), name="workspace"),
     path("todos/",                    TodoListView.as_view(),      name="todo-list"),
     path("todos/new/",                TodoCreateView.as_view(),    name="todo-create"),
@@ -42,4 +45,5 @@ urlpatterns = [
     path("settings/timezone/",        SettingsTimezoneView.as_view(), name="settings-timezone"),
     path("settings/meetings/",        SettingsMeetingsView.as_view(), name="settings-meetings"),
     path("settings/calendars/<int:pk>/disconnect/", SettingsCalendarDisconnectView.as_view(), name="settings-disconnect"),
+    path("settings/calendars/sources/<int:pk>/",    SettingsCalendarSourceView.as_view(),     name="settings-source"),
 ]

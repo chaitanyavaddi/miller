@@ -6,6 +6,16 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from accounts.mixins import GuestSessionMixin, SignedInRequiredMixin
 from board.mixins import BoardResponseMixin
 from board.services import BoardService
+from utils.view_helper import redirect_to
+
+
+class HomeView(View):
+    """The front door: what Miller is, with the real board below to try. Members go straight to their list."""
+
+    def get(self, request):
+        if request.user.is_authenticated and not request.user.is_guest:
+            return redirect_to(request, "board:index")
+        return render(request, "home.html")
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")

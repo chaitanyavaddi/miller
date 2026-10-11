@@ -1,0 +1,56 @@
+{% extends "legal/base.html" %}
+
+{% block title %}Terms · Miller{% endblock %}
+{% block heading %}Terms.{% endblock %}
+{% block more %}Using Miller means agreeing to these.{% endblock %}
+
+{% block sections %}
+<section class="legal__section">
+  <h2>Your account</h2>
+  <div class="legal__body">
+    <p>Use Miller as a guest, or sign in with Google. You're responsible for what happens under your account. A guest list lives in one browser: clear its cookies and the list is gone.</p>
+  </div>
+</section>
+
+<section class="legal__section">
+  <h2>Your content</h2>
+  <div class="legal__body">
+    <p>What you write and attach stays yours. Miller only needs your permission to store it and show it back to you. Don't keep anything in Miller that's illegal or that you don't have the right to keep.</p>
+  </div>
+</section>
+
+<section class="legal__section">
+  <h2>Connected calendars</h2>
+  <div class="legal__body">
+    <p>Connecting a calendar lets Miller read it as the <a href="{% url 'privacy' %}">privacy page</a> describes. Disconnect it at any time.</p>
+  </div>
+</section>
+
+<section class="legal__section">
+  <h2>Fair use</h2>
+  <div class="legal__body">
+    <p>Don't try to break, overload or get around Miller's security, or use it to harm anyone. Accounts that do may be suspended.</p>
+  </div>
+</section>
+
+<section class="legal__section">
+  <h2>The service</h2>
+  <div class="legal__body">
+    <p>Miller is built with care and provided as is. It may have bugs or downtime, and features can change. Keep a copy of anything you can't afford to lose. As far as the law allows, Miller isn't liable for indirect or consequential losses from using it.</p>
+  </div>
+</section>
+
+<section class="legal__section">
+  <h2>Ending</h2>
+  <div class="legal__body">
+    <p>Stop using Miller and ask for your account to be deleted at any time. If Miller ever shuts down, you'll be told in advance.</p>
+  </div>
+</section>
+
+<section class="legal__section">
+  <h2>Changes and contact</h2>
+  <div class="legal__body">
+    <p>If these terms change in a way that matters, the date below changes and signed-in users are told in the app. Questions go to <a href="mailto:hello@miller.so">hello@miller.so</a>.</p>
+  </div>
+</section>
+{% endblock %}

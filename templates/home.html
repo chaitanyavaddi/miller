@@ -1,18 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}Miller{% endblock %}
+{% block title %}Miller · a quiet todo list{% endblock %}
+
+{% block head %}<meta name="description" content="Miller: today, in order. Your todos and meetings in one list, with notes on each. Nothing else.">{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/home.css' %}">
 {% endblock %}
 
 {% block content %}
-<main class="home">
-  <header class="home__top">
-    <h1 class="home__brand"><c-ui.logo /></h1>
-    <a class="text-btn home__cta" href="{% url 'board:index' %}">Open the list</a>
-  </header>
+<div class="home">
+  <c-site.nav />
 
-  <p class="home__line">An ordered list. A thread for each todo.</p>
-</main>
+  <main class="home__hero">
+    <h1 class="home__title">Today, in order.<span class="home__title-more"> Your todos and meetings in one list. Nothing else.</span></h1>
+    <a class="text-btn home__try" href="{% url 'board:index' %}">Try it, no account needed</a>
+  </main>
+
+  <c-site.footer />
+</div>
 {% endblock %}

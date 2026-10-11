@@ -1,4 +1,5 @@
 .signin { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center; }
 .signin__title { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+.signin__home { color: inherit; text-decoration: none; }
 .signin__note { font-size: 13px; color: var(--text-4); max-width: 36ch; }
 .signin__action { padding: 12px 8px; }

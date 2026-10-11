@@ -8,7 +8,7 @@
 
 {% block content %}
 <main class="signin">
-  <h1 class="signin__title">{% if signed_out %}You’re signed out.{% else %}<c-ui.logo />{% endif %}</h1>
+  <h1 class="signin__title">{% if signed_out %}You’re signed out.{% else %}<a class="signin__home" href="{% url 'board:home' %}" aria-label="Miller home"><c-ui.logo /></a>{% endif %}</h1>
   <c-ui.messages />
   {% if google_enabled %}
     <a class="text-btn signin__action" href="{% url 'accounts:google-start' %}">{% if signed_out %}Sign back in{% else %}Continue with Google{% endif %}</a>
