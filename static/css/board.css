@@ -41,6 +41,8 @@
 .settings__calendar-email { font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings__calendar-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); flex: none; }
 .settings__calendar-action { margin-left: auto; flex: none; }
+.settings__source { display: flex; align-items: center; min-height: 30px; padding-left: 14px; }
+.settings__source .settings__toggle { font-size: 13px; color: var(--text-2); }
 .settings__suggest { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; color: var(--text); text-decoration: none; border-bottom: 1px dotted var(--border); }
 .settings__suggest:hover .settings__suggest-text { text-decoration: underline dotted; text-underline-offset: 4px; }
 .settings__suggest-text { font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

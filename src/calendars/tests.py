@@ -1,160 +1,346 @@
-import base64
-import hashlib
-import hmac
 import json
-import time
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
+from io import StringIO
 from unittest.mock import patch
 
+from cryptography.fernet import Fernet
+from django.core.cache import cache
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from accounts.services import GuestService, IdentityService
-from calendars.models import CalendarConnection, CalendarEvent
-from calendars.services import NOTICE_KEY, CalendarGrant, CalendarService, RecallService
+from calendars.models import CalendarConnection, CalendarEvent, CalendarSource
+from calendars.services import (
+    NOTICE_KEY, CalendarApiError, CalendarAuthError, CalendarGrant, CalendarOAuthService, CalendarService,
+    GoogleCalendarApi, MicrosoftCalendarApi, RemoteEvent, TokenVault,
+)
+from calendars.services.calendar_api import Channel, RemoteCalendar
+from calendars.services.oauth_service import AccessGrant
 from todos.models import Todo
-from todos.services import TodoService
 
-SECRET = "whsec_" + base64.b64encode(b"recall-test-secret").decode()
+KEY = Fernet.generate_key().decode()
+GOOGLE = "calendars.services.calendar_service.APIS"
 
 
-def event(recall_id, start, title="Design sync", platform="google_calendar", **raw):
+def google_item(event_id, start, title="Design sync", **extra):
     return {
-        "id": recall_id, "platform": platform, "is_deleted": False, "ical_uid": f"uid-{recall_id}",
-        "start_time": start.isoformat(), "end_time": (start + timedelta(minutes=30)).isoformat(),
-        "meeting_url": "https://meet.google.com/abc-defg-hij",
-        "raw": {"summary": title, "start": {"dateTime": start.isoformat()}, **raw},
+        "id": event_id, "iCalUID": f"uid-{event_id}", "summary": title, "status": "confirmed",
+        "start": {"dateTime": start.isoformat()}, "end": {"dateTime": (start + timedelta(minutes=30)).isoformat()},
+        "hangoutLink": "https://meet.google.com/abc-defg-hij", **extra,
     }
 
 
-def signed(body: bytes, secret=SECRET):
-    message_id, stamp = "msg_1", str(int(time.time()))
-    key = base64.b64decode(secret.removeprefix("whsec_"))
-    signature = base64.b64encode(hmac.new(key, f"{message_id}.{stamp}.".encode() + body, hashlib.sha256).digest()).decode()
-    return {"HTTP_WEBHOOK_ID": message_id, "HTTP_WEBHOOK_TIMESTAMP": stamp, "HTTP_WEBHOOK_SIGNATURE": f"v1,{signature}"}
+def remote(event_id, start, title="Design sync", **extra):
+    return RemoteEvent(event_id, GoogleCalendarApi.fields(google_item(event_id, start, title, **extra)))
 
 
-class MeetingSyncTests(TestCase):
+class FakeApi:
+    """Stands in for GoogleCalendarApi/MicrosoftCalendarApi: canned calendars and events, recorded channel calls."""
+
+    def __init__(self, calendars=None, events=None):
+        self.calendars_list = calendars if calendars is not None else [RemoteCalendar("primary-id", "Work", True)]
+        self.events_by_calendar = events or {}
+        self.watched, self.unwatched, self.revoked = [], [], []
+
+    def calendars(self, token):
+        return self.calendars_list
+
+    def events(self, token, calendar_id, start, end):
+        return iter(self.events_by_calendar.get(calendar_id, []))
+
+    def watch(self, token, source, address, secret_for):
+        self.watched.append(source.external_id)
+        return Channel(f"ch-{len(self.watched)}", f"res-{len(self.watched)}", timezone.now() + timedelta(days=7))
+
+    def renew(self, token, source, address, secret_for):
+        return self.watch(token, source, address, secret_for)
+
+    def unwatch(self, token, source):
+        self.unwatched.append(source.channel_id)
+
+    def revoke(self, refresh_token):
+        self.revoked.append(refresh_token)
+
+
+@override_settings(CALENDAR_TOKEN_KEY=KEY, GOOGLE_CLIENT_ID="id", GOOGLE_CLIENT_SECRET="secret")
+class CalendarTestCase(TestCase):
     def setUp(self):
+        cache.clear()
         self.user = IdentityService.create_user("a@x.com", show_meetings=True)
-        self.connection = CalendarConnection.objects.create(user=self.user, provider="google", email="a@x.com", recall_id="cal-1")
+        self.connection = CalendarConnection.objects.create(user=self.user, provider="google", email="a@x.com", refresh_token=TokenVault.seal("r1"))
+        self.source = CalendarSource.objects.create(connection=self.connection, external_id="primary-id", name="Work", is_primary=True, enabled=True)
         self.start = timezone.now().replace(minute=0, second=0, microsecond=0) + timedelta(days=1)
+        patcher = patch.object(CalendarOAuthService, "refresh", side_effect=lambda provider, token: AccessGrant("access", token))
+        self.refresh = patcher.start()
+        self.addCleanup(patcher.stop)
 
     def meetings(self):
-        return list(Todo.objects.filter(kind=Todo.Kind.MEETING).values_list("title", flat=True))
+        return sorted(Todo.objects.filter(kind=Todo.Kind.MEETING).values_list("title", flat=True))
 
+
+class EventParsingTests(TestCase):
+    def setUp(self):
+        self.start = timezone.now().replace(minute=0, second=0, microsecond=0)
+
+    def test_a_google_event_reads_its_title_time_link_and_uid(self):
+        fields = GoogleCalendarApi.fields(google_item("e1", self.start))
+        self.assertEqual((fields.title, fields.starts_at, fields.ical_uid), ("Design sync", self.start, "uid-e1"))
+        self.assertEqual(fields.meeting_url, "https://meet.google.com/abc-defg-hij")
+
+    def test_google_cancelled_declined_all_day_and_working_location_events_are_skipped(self):
+        self.assertIsNone(GoogleCalendarApi.fields(google_item("e", self.start, status="cancelled")))
+        self.assertIsNone(GoogleCalendarApi.fields(google_item("e", self.start, attendees=[{"self": True, "responseStatus": "declined"}])))
+        self.assertIsNone(GoogleCalendarApi.fields({**google_item("e", self.start), "start": {"date": "2026-10-12"}}))
+        self.assertIsNone(GoogleCalendarApi.fields(google_item("e", self.start, eventType="workingLocation")))
+
+    def test_a_meeting_link_is_found_in_the_description_when_there_is_no_conferencing(self):
+        item = {**google_item("e", self.start), "hangoutLink": "", "description": "Join: https://acme.zoom.us/j/123?pwd=x thanks"}
+        self.assertEqual(GoogleCalendarApi.fields(item).meeting_url, "https://acme.zoom.us/j/123?pwd=x")
+
+    def test_an_outlook_event_reads_its_utc_times_subject_and_teams_link(self):
+        item = {
+            "id": "o1", "iCalUId": "uid-o1", "subject": "Vendor check-in", "isAllDay": False, "isCancelled": False,
+            "start": {"dateTime": "2026-10-12T09:00:00.0000000", "timeZone": "UTC"},
+            "end": {"dateTime": "2026-10-12T09:30:00.0000000", "timeZone": "UTC"},
+            "onlineMeeting": {"joinUrl": "https://teams.microsoft.com/l/meetup-join/1"},
+        }
+        fields = MicrosoftCalendarApi.fields(item)
+        self.assertEqual(fields.title, "Vendor check-in")
+        self.assertEqual(fields.starts_at, datetime(2026, 10, 12, 9, 0, tzinfo=UTC))
+        self.assertEqual(fields.meeting_url, "https://teams.microsoft.com/l/meetup-join/1")
+        self.assertIsNone(MicrosoftCalendarApi.fields({**item, "isAllDay": True}))
+        self.assertIsNone(MicrosoftCalendarApi.fields({**item, "responseStatus": {"response": "declined"}}))
+
+
+class MeetingSyncTests(CalendarTestCase):
     def test_an_event_becomes_a_meeting_at_its_time(self):
-        CalendarService.apply(self.connection, event("e1", self.start))
+        CalendarService.apply(self.source, remote("e1", self.start))
         meeting = Todo.objects.get(kind=Todo.Kind.MEETING)
         self.assertEqual((meeting.title, meeting.starts_at), ("Design sync", self.start))
-        self.assertEqual(meeting.meeting_url, "https://meet.google.com/abc-defg-hij")
 
     def test_a_moved_event_moves_its_meeting_and_keeps_its_thread(self):
-        CalendarService.apply(self.connection, event("e1", self.start))
+        CalendarService.apply(self.source, remote("e1", self.start))
         meeting = Todo.objects.get(kind=Todo.Kind.MEETING)
-        CalendarService.apply(self.connection, event("e1", self.start + timedelta(days=2), title="Moved sync"))
+        CalendarService.apply(self.source, remote("e1", self.start + timedelta(days=2), title="Moved sync"))
         meeting.refresh_from_db()
         self.assertEqual((meeting.title, meeting.starts_at), ("Moved sync", self.start + timedelta(days=2)))
 
-    def test_deleted_cancelled_declined_and_all_day_events_are_not_listed(self):
-        CalendarService.apply(self.connection, event("e1", self.start))
-        CalendarService.apply(self.connection, {**event("e1", self.start), "is_deleted": True})
-        CalendarService.apply(self.connection, event("e2", self.start, status="cancelled"))
-        CalendarService.apply(self.connection, event("e3", self.start, attendees=[{"self": True, "responseStatus": "declined"}]))
-        CalendarService.apply(self.connection, {**event("e4", self.start), "raw": {"summary": "Holiday", "start": {"date": "2026-10-12"}}})
+    def test_a_cancelled_event_comes_off_the_list(self):
+        CalendarService.apply(self.source, remote("e1", self.start))
+        CalendarService.apply(self.source, remote("e1", self.start, status="cancelled"))
         self.assertEqual(self.meetings(), [])
 
-    def test_outlook_events_read_their_subject_and_flags(self):
-        outlook = {**event("o1", self.start, platform="microsoft_outlook"), "raw": {"subject": "Vendor check-in"}}
-        CalendarService.apply(self.connection, outlook)
-        CalendarService.apply(self.connection, {**event("o2", self.start, platform="microsoft_outlook"), "raw": {"subject": "Off", "isAllDay": True}})
-        self.assertEqual(self.meetings(), ["Vendor check-in"])
-
     def test_the_same_meeting_in_two_calendars_is_listed_once(self):
-        other = CalendarConnection.objects.create(user=self.user, provider="google", email="b@x.com", recall_id="cal-2")
-        CalendarService.apply(self.connection, event("e1", self.start))
-        CalendarService.apply(other, {**event("e2", self.start), "ical_uid": "uid-e1"})
+        other = CalendarSource.objects.create(connection=self.connection, external_id="team", name="Team", enabled=True)
+        CalendarService.apply(self.source, remote("e1", self.start))
+        CalendarService.apply(other, RemoteEvent("e2", GoogleCalendarApi.fields({**google_item("e2", self.start), "iCalUID": "uid-e1"})))
         self.assertEqual(self.meetings(), ["Design sync"])
-        CalendarService.apply(self.connection, {**event("e1", self.start), "is_deleted": True})
+        CalendarService.apply(self.source, remote("e1", self.start, status="cancelled"))
         self.assertEqual(self.meetings(), ["Design sync"])  # still on the other calendar
 
-    @patch.object(RecallService, "delete_calendar")
-    def test_disconnecting_takes_the_calendars_meetings_off_the_list(self, delete_calendar):
-        CalendarService.apply(self.connection, event("e1", self.start))
-        CalendarService.disconnect(self.connection)
-        delete_calendar.assert_called_once_with("cal-1")
-        self.assertEqual((self.meetings(), CalendarEvent.objects.count()), ([], 0))
+    def test_sync_applies_the_window_and_drops_events_no_longer_in_it(self):
+        api = FakeApi(events={"primary-id": [remote("e1", self.start), remote("e2", self.start + timedelta(hours=2), title="Retro")]})
+        with patch.dict(GOOGLE, {"google": api}):
+            CalendarService.sync_source(self.source)
+            self.assertEqual(self.meetings(), ["Design sync", "Retro"])
+            api.events_by_calendar["primary-id"] = [remote("e2", self.start + timedelta(hours=2), title="Retro")]
+            CalendarService.sync_source(self.source)
+        self.assertEqual(self.meetings(), ["Retro"])
 
-    @patch.object(RecallService, "events")
-    def test_sync_applies_every_event_recall_returns(self, events):
-        events.return_value = iter([event("e1", self.start), event("e2", self.start + timedelta(hours=2), title="Retro")])
-        CalendarService.sync(self.connection)
-        self.assertEqual(sorted(self.meetings()), ["Design sync", "Retro"])
+    def test_the_account_sync_reads_only_enabled_calendars(self):
+        api = FakeApi(
+            calendars=[RemoteCalendar("primary-id", "Work", True), RemoteCalendar("family", "Family", False)],
+            events={"primary-id": [remote("e1", self.start)], "family": [remote("f1", self.start, title="Dentist")]},
+        )
+        with patch.dict(GOOGLE, {"google": api}):
+            CalendarService.sync(self.connection)
+        self.assertEqual(self.meetings(), ["Design sync"])
+        self.assertFalse(CalendarSource.objects.get(external_id="family").enabled)  # a calendar found later arrives off
         self.connection.refresh_from_db()
         self.assertIsNotNone(self.connection.synced_at)
 
+    def test_a_calendar_removed_from_the_account_takes_its_meetings_with_it(self):
+        CalendarService.apply(self.source, remote("e1", self.start))
+        with patch.dict(GOOGLE, {"google": FakeApi(calendars=[RemoteCalendar("other", "Other", True)])}):
+            CalendarService.refresh_sources(self.connection, "access")
+        self.assertEqual((self.meetings(), list(self.connection.sources.values_list("name", flat=True))), ([], ["Other"]))
 
-@override_settings(RECALL_WEBHOOK_SECRET=SECRET)
-class RecallWebhookTests(TestCase):
-    def setUp(self):
-        self.user = IdentityService.create_user("a@x.com", show_meetings=True)
-        self.connection = CalendarConnection.objects.create(user=self.user, provider="google", email="a@x.com", recall_id="cal-1")
-        self.url = reverse("calendars:webhook")
+    def test_switching_a_calendar_on_pulls_its_meetings_in_and_off_takes_them_out(self):
+        family = CalendarSource.objects.create(connection=self.connection, external_id="family", name="Family")
+        api = FakeApi(events={"family": [remote("f1", self.start, title="Dentist")]})
+        with patch.dict(GOOGLE, {"google": api}):
+            CalendarService.set_enabled(family, True)
+            self.assertEqual(self.meetings(), ["Dentist"])
+            CalendarService.set_enabled(family, False)
+        self.assertEqual(self.meetings(), [])
 
-    def post(self, payload, headers=None):
-        body = json.dumps(payload).encode()
-        return self.client.post(self.url, body, content_type="application/json", **(headers if headers is not None else signed(body)))
+    def test_disconnecting_stops_channels_revokes_and_takes_meetings_off(self):
+        self.source.channel_id, self.source.channel_resource = "ch-1", "res-1"
+        self.source.save()
+        CalendarService.apply(self.source, remote("e1", self.start))
+        api = FakeApi()
+        with patch.dict(GOOGLE, {"google": api}):
+            CalendarService.disconnect(self.connection)
+        self.assertEqual((api.unwatched, api.revoked), (["ch-1"], ["r1"]))
+        self.assertEqual((self.meetings(), CalendarEvent.objects.count(), CalendarConnection.objects.count()), ([], 0, 0))
 
-    def test_an_unsigned_or_forged_webhook_is_refused(self):
-        self.assertEqual(self.post({"event": "calendar.sync_events"}, headers={}).status_code, 401)
-        forged = signed(b"something else")
-        self.assertEqual(self.post({"event": "calendar.sync_events"}, headers=forged).status_code, 401)
+    def test_disconnecting_works_even_when_the_token_is_dead(self):
+        self.refresh.side_effect = CalendarAuthError("invalid_grant", 400)
+        CalendarService.disconnect(self.connection)
+        self.assertFalse(CalendarConnection.objects.exists())
 
-    @patch.object(CalendarService, "sync")
-    def test_sync_events_pulls_what_changed_since_the_stamp(self, sync):
-        response = self.post({"event": "calendar.sync_events", "data": {"calendar_id": "cal-1", "last_updated_ts": "2026-10-10T08:00:00Z"}})
-        self.assertEqual(response.status_code, 204)
-        connection, since = sync.call_args.args
-        self.assertEqual((connection, since.isoformat()), (self.connection, "2026-10-10T08:00:00+00:00"))
 
-    @patch.object(RecallService, "calendar", return_value={"status": "disconnected"})
-    def test_calendar_update_refreshes_the_connection_status(self, calendar):
-        self.post({"event": "calendar.update", "data": {"calendar_id": "cal-1"}})
+class ConnectionTests(CalendarTestCase):
+    def test_tokens_are_stored_encrypted(self):
+        self.assertNotIn("r1", self.connection.refresh_token)
+        self.assertEqual(TokenVault.open(self.connection.refresh_token), "r1")
+
+    def test_connecting_switches_the_primary_calendar_on_and_turns_meetings_on(self):
+        user = IdentityService.create_user("b@x.com")
+        api = FakeApi(calendars=[RemoteCalendar("p", "Me", True), RemoteCalendar("s", "Team", False)], events={"p": [remote("e1", self.start)]})
+        with patch.dict(GOOGLE, {"google": api}):
+            connection = CalendarService.connect(user, "google", CalendarGrant(refresh_token="new", email="b@x.com"))
+        self.assertEqual(list(connection.sources.filter(enabled=True).values_list("name", flat=True)), ["Me"])
+        self.assertEqual(Todo.objects.filter(user=user, kind=Todo.Kind.MEETING).count(), 1)
+        user.refresh_from_db()
+        self.assertTrue(user.show_meetings)
+
+    def test_reconnecting_a_lost_account_takes_the_new_token(self):
+        self.connection.status = CalendarConnection.Status.DISCONNECTED
+        self.connection.save()
+        with patch.dict(GOOGLE, {"google": FakeApi()}):
+            connection = CalendarService.connect(self.user, "google", CalendarGrant(refresh_token="r2", email="a@x.com"))
+        self.assertEqual(connection.pk, self.connection.pk)
+        self.assertEqual((connection.status, TokenVault.open(connection.refresh_token)), ("connected", "r2"))
+
+    def test_a_refused_refresh_token_marks_the_account_disconnected(self):
+        self.refresh.side_effect = CalendarAuthError("invalid_grant", 400)
+        with self.assertRaises(CalendarAuthError):
+            CalendarService.access_token(self.connection)
         self.connection.refresh_from_db()
         self.assertEqual(self.connection.status, CalendarConnection.Status.DISCONNECTED)
 
+    def test_a_rotated_refresh_token_is_kept_and_access_tokens_are_cached(self):
+        self.refresh.side_effect = None
+        self.refresh.return_value = AccessGrant("access", "r-rotated")
+        CalendarService.access_token(self.connection)
+        CalendarService.access_token(self.connection)
+        self.connection.refresh_from_db()
+        self.assertEqual((self.refresh.call_count, TokenVault.open(self.connection.refresh_token)), (1, "r-rotated"))
 
-@override_settings(RECALL_API_KEY="key", GOOGLE_CLIENT_ID="id", GOOGLE_CLIENT_SECRET="secret")
+    @override_settings(SITE_URL="https://miller.test")
+    def test_push_channels_open_and_are_renewed_only_when_about_to_lapse(self):
+        api = FakeApi()
+        with patch.dict(GOOGLE, {"google": api}):
+            CalendarService.sync(self.connection)
+            CalendarService.sync(self.connection)
+            self.assertEqual(api.watched, ["primary-id"])
+            CalendarSource.objects.filter(pk=self.source.pk).update(channel_expires_at=timezone.now() + timedelta(hours=2))
+            CalendarService.sync(self.connection)
+        self.assertEqual(len(api.watched), 2)
+
+    def test_without_https_no_channel_is_opened(self):
+        api = FakeApi()
+        with patch.dict(GOOGLE, {"google": api}):
+            CalendarService.sync(self.connection)
+        self.assertEqual(api.watched, [])
+
+    def test_the_scheduled_sync_counts_accounts_that_lost_access(self):
+        self.refresh.side_effect = CalendarAuthError("invalid_grant", 400)
+        out = StringIO()
+        call_command("sync_calendars", stdout=out)
+        self.assertIn("1 need reconnecting", out.getvalue())
+
+
+class WebhookTests(CalendarTestCase):
+    def setUp(self):
+        super().setUp()
+        self.source.channel_id, self.source.channel_resource = "ch-1", "sub-1"
+        self.source.save()
+        self.secret = CalendarService.channel_secret("ch-1")
+
+    def google_push(self, token, state="exists"):
+        return self.client.post(reverse("calendars:webhook", args=["google"]), HTTP_X_GOOG_CHANNEL_ID="ch-1",
+                                HTTP_X_GOOG_CHANNEL_TOKEN=token, HTTP_X_GOOG_RESOURCE_STATE=state)
+
+    @patch.object(CalendarService, "sync_source")
+    def test_a_google_push_with_the_channel_secret_resyncs_that_calendar(self, sync_source):
+        self.assertEqual(self.google_push(self.secret).status_code, 200)
+        self.assertEqual(sync_source.call_args.args[0], self.source)
+
+    @patch.object(CalendarService, "sync_source")
+    def test_a_forged_google_push_or_a_channel_hello_does_nothing(self, sync_source):
+        self.assertEqual(self.google_push("forged").status_code, 200)
+        self.assertEqual(self.google_push(self.secret, state="sync").status_code, 200)
+        sync_source.assert_not_called()
+
+    def test_graph_validation_echoes_the_token(self):
+        response = self.client.post(reverse("calendars:webhook", args=["microsoft"]) + "?validationToken=abc%20123")
+        self.assertEqual((response.status_code, response.content, response["Content-Type"]), (200, b"abc 123", "text/plain"))
+
+    @patch.object(CalendarService, "sync_source")
+    def test_graph_notifications_resync_only_calendars_with_a_matching_client_state(self, sync_source):
+        CalendarConnection.objects.filter(pk=self.connection.pk).update(provider="microsoft")
+        body = {"value": [
+            {"subscriptionId": "sub-1", "clientState": self.secret},
+            {"subscriptionId": "sub-1", "clientState": self.secret},
+            {"subscriptionId": "sub-1", "clientState": "forged"},
+        ]}
+        response = self.client.post(reverse("calendars:webhook", args=["microsoft"]), json.dumps(body), content_type="application/json")
+        self.assertEqual((response.status_code, sync_source.call_count), (202, 1))
+
+    @patch.object(CalendarService, "sync_source", side_effect=CalendarApiError("down"))
+    def test_a_failed_sync_asks_the_provider_to_retry(self, sync_source):
+        self.assertEqual(self.google_push(self.secret).status_code, 502)
+
+
+@override_settings(CALENDAR_TOKEN_KEY=KEY, GOOGLE_CLIENT_ID="id", GOOGLE_CLIENT_SECRET="secret")
 class ConnectFlowTests(TestCase):
     def setUp(self):
         self.user = IdentityService.create_user("a@x.com")
         self.client.force_login(self.user)
 
-    def test_connect_sends_the_user_to_google_with_the_suggested_address(self):
+    def callback(self):
+        self.client.get(reverse("calendars:connect", args=["google"]))
+        state = self.client.session["calendar_oauth_state"].split(":", 1)[1]
+        return self.client.get(reverse("calendars:callback", args=["google"]), {"state": state, "code": "c"})
+
+    def test_connect_sends_the_user_to_google_asking_for_calendar_access(self):
         response = self.client.get(reverse("calendars:connect", args=["google"]), {"hint": "a@x.com"})
         self.assertIn("accounts.google.com", response["Location"])
-        self.assertIn("calendar.events.readonly", response["Location"])
+        self.assertIn("calendar.events+", response["Location"].replace("%2F", "/").replace("%3A", ":"))
+        self.assertIn("calendar.calendarlist.readonly", response["Location"])
         self.assertIn("login_hint=a%40x.com", response["Location"])
+
+    @override_settings(CALENDAR_TOKEN_KEY="")
+    def test_without_a_token_key_calendars_cant_be_connected(self):
+        response = self.client.get(reverse("calendars:connect", args=["google"]))
+        self.assertEqual(self.client.session[NOTICE_KEY], "Calendar connections aren't set up on this server yet.")
+        self.assertEqual(response.status_code, 302)
 
     def test_guests_cannot_connect_a_calendar(self):
         self.client.force_login(GuestService.create_guest())
         response = self.client.get(reverse("calendars:connect", args=["google"]))
         self.assertEqual(response["Location"], reverse("board:index"))
 
-    @patch.object(RecallService, "events", return_value=iter([]))
-    @patch.object(RecallService, "create_calendar", return_value={"id": "cal-9", "status": "connected"})
+    @patch.object(CalendarService, "sync")
     @patch("calendars.views.CalendarOAuthService.exchange", return_value=CalendarGrant(refresh_token="r", email="work@x.com"))
-    def test_the_callback_connects_the_calendar_and_turns_meetings_on(self, exchange, create_calendar, events):
-        self.client.get(reverse("calendars:connect", args=["google"]))
-        state = self.client.session["calendar_oauth_state"].split(":", 1)[1]
-        response = self.client.get(reverse("calendars:callback", args=["google"]), {"state": state, "code": "c"})
+    def test_the_callback_connects_the_calendar(self, exchange, sync):
+        response = self.callback()
         self.assertEqual(response["Location"], reverse("board:index") + "?settings=1")
         self.assertEqual(self.client.session[NOTICE_KEY], "Connected work@x.com.")
-        connection = CalendarConnection.objects.get()
-        self.assertEqual((connection.email, connection.recall_id, connection.status), ("work@x.com", "cal-9", "connected"))
-        self.user.refresh_from_db()
-        self.assertTrue(self.user.show_meetings)
+        self.assertEqual(CalendarConnection.objects.get().email, "work@x.com")
+
+    @patch("calendars.services.oauth_service.call", return_value={
+        "refresh_token": "r", "scope": "openid email",
+        "id_token": "x.eyJlbWFpbCI6ICJ3b3JrQHguY29tIn0.y",
+    })
+    def test_unticking_calendar_access_on_the_consent_screen_connects_nothing(self, call):
+        self.callback()
+        self.assertEqual(self.client.session[NOTICE_KEY], "The calendar didn't grant access. Try again.")
+        self.assertFalse(CalendarConnection.objects.exists())
 
     def test_a_callback_with_a_stale_state_connects_nothing(self):
         response = self.client.get(reverse("calendars:callback", args=["google"]), {"state": "nope", "code": "c"})

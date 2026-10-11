@@ -9,7 +9,7 @@ from rules.contrib.views import PermissionRequiredMixin
 
 from accounts.mixins import SignedInRequiredMixin
 from calendars.models import CalendarConnection
-from calendars.services import NOTICE_KEY, CalendarOAuthService, CalendarService, RecallError, RecallService
+from calendars.services import NOTICE_KEY, CalendarApiError, CalendarOAuthService, CalendarService
 from utils.view_helper import redirect_to
 
 SETTINGS_URL = "board:index"
@@ -48,25 +48,54 @@ class CalendarCallbackView(CalendarFlowMixin, View):
             return self.back_to_settings("The calendar didn't grant access. Try again.")
         try:
             connection = CalendarService.connect(request.user, provider, grant)
-        except RecallError:
-            return self.back_to_settings("Couldn't reach the calendar service. Try again in a minute.")
+        except CalendarApiError:
+            return self.back_to_settings("Couldn't reach the calendar. Try again in a minute.")
         return self.back_to_settings(f"Connected {connection.email}.")
 
 
 @method_decorator(csrf_exempt, name="dispatch")
-class RecallWebhookView(View):
-    """Recall's calendar webhooks. Signed, so anyone else's POST is refused; a failed sync answers
-    502 so Recall retries it."""
+class CalendarWebhookView(View):
+    """Push notifications that a calendar changed: we re-read it. Each carries the secret its channel
+    was opened with, so anyone else's POST does nothing. A failed sync answers 502 so the provider
+    retries it."""
 
-    def post(self, request):
-        if not RecallService.verify_webhook(request.headers, request.body):
-            return HttpResponse(status=401)
+    def post(self, request, provider):
+        if provider == CalendarConnection.Provider.GOOGLE:
+            return self.google(request)
+        if provider == CalendarConnection.Provider.MICROSOFT:
+            return self.microsoft(request)
+        raise Http404("No such calendar provider")
+
+    def google(self, request):
+        if request.headers.get("X-Goog-Resource-State") == "sync":
+            return HttpResponse(status=200)  # a new channel's hello (before we've even saved it): nothing changed yet
+        source = CalendarService.source_for_push(
+            CalendarConnection.Provider.GOOGLE,
+            channel_id=request.headers.get("X-Goog-Channel-ID", ""),
+            secret=request.headers.get("X-Goog-Channel-Token", ""),
+        )
+        return self.sync([source] if source is not None else [])
+
+    def microsoft(self, request):
+        if "validationToken" in request.GET:  # Graph checks the address when a subscription is made
+            return HttpResponse(request.GET["validationToken"], content_type="text/plain")
         try:
-            payload = json.loads(request.body)
-        except ValueError:
+            notices = json.loads(request.body).get("value") or []
+        except (ValueError, AttributeError):
             return HttpResponse(status=400)
+        sources = {}
+        for notice in notices:
+            source = CalendarService.source_for_push(
+                CalendarConnection.Provider.MICROSOFT, resource=notice.get("subscriptionId", ""), secret=notice.get("clientState", ""),
+            )
+            if source is not None:
+                sources[source.pk] = source
+        return self.sync(sources.values(), status=202)
+
+    def sync(self, sources, status=200):
         try:
-            CalendarService.handle_webhook(payload)
-        except RecallError:
+            for source in sources:
+                CalendarService.sync_source(source)
+        except CalendarApiError:
             return HttpResponse(status=502)
-        return HttpResponse(status=204)
+        return HttpResponse(status=status)

@@ -40,9 +40,25 @@
         {% for connection in connections %}
         <li class="settings__calendar">
           <span class="settings__calendar-email">{{ connection.email }}</span>
-          <span class="settings__calendar-meta">{{ connection.get_provider_display }}{% if connection.status != "connected" %} · {{ connection.get_status_display|lower }}{% endif %}</span>
-          <c-ui.text-button class="text-btn--small settings__calendar-action" hx-post="{% url 'board:settings-disconnect' connection.id %}" hx-target="#overlay" hx-swap="innerHTML">Disconnect</c-ui.text-button>
+          <span class="settings__calendar-meta">{{ connection.get_provider_display }}{% if connection.status != "connected" %} · lost access{% endif %}</span>
+          {% if connection.status != "connected" %}
+          <a class="text-btn text-btn--small settings__calendar-action" href="{% url 'calendars:connect' connection.provider %}?hint={{ connection.email|urlencode }}">Reconnect</a>
+          {% endif %}
+          <c-ui.text-button class="text-btn--small{% if connection.status == 'connected' %} settings__calendar-action{% endif %}" hx-post="{% url 'board:settings-disconnect' connection.id %}" hx-target="#overlay" hx-swap="innerHTML">Disconnect</c-ui.text-button>
         </li>
+        {% if connection.status == "connected" and connection.sources.all|length > 1 %}
+        {% for source in connection.sources.all %}
+        <li class="settings__source">
+          <form hx-post="{% url 'board:settings-source' source.id %}" hx-trigger="change" hx-target="#overlay" hx-swap="innerHTML">
+            {% csrf_token %}
+            <label class="settings__toggle">
+              <input type="checkbox" name="enabled" value="1"{% if source.enabled %} checked{% endif %}>
+              <span>{{ source.name }}{% if source.is_primary %} <span class="settings__calendar-meta">primary</span>{% endif %}</span>
+            </label>
+          </form>
+        </li>
+        {% endfor %}
+        {% endif %}
         {% endfor %}
       </ul>
       {% endif %}

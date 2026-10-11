@@ -5,8 +5,9 @@ from accounts.mixins import SignedInRequiredMixin
 from accounts.schemas import MeetingsToggleSchema, TimezoneSchema
 from accounts.services import PreferenceService
 from board.services import SettingsService
-from calendars.mixins import CalendarConnectionPermissionRequiredMixin
-from calendars.services import NOTICE_KEY, CalendarService
+from calendars.mixins import CalendarConnectionPermissionRequiredMixin, CalendarSourcePermissionRequiredMixin
+from calendars.schemas import SourceToggleSchema
+from calendars.services import NOTICE_KEY, CalendarApiError, CalendarAuthError, CalendarService
 from utils.view_helper import refresh_board, render_fragment
 
 TEMPLATE = "board.settings"
@@ -52,3 +53,18 @@ class SettingsCalendarDisconnectView(CalendarConnectionPermissionRequiredMixin, 
         email = self.connection.email
         CalendarService.disconnect(self.connection)
         return refresh_board(self.render_settings(f"Disconnected {email}."))
+
+
+class SettingsCalendarSourceView(CalendarSourcePermissionRequiredMixin, SettingsResponseMixin, View):
+    """Switch one calendar of a connected account on or off."""
+    permission_required = "calendars.change_source"
+
+    def post(self, request, pk):
+        data = SourceToggleSchema.from_post(request)
+        try:
+            CalendarService.set_enabled(self.source, data.enabled)
+        except CalendarAuthError:
+            return self.render_settings(f"{self.source.connection.email} lost access. Reconnect it.")
+        except CalendarApiError:
+            return self.render_settings("Couldn't reach the calendar. Try again in a minute.")
+        return refresh_board(self.render_settings())

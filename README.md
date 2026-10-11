@@ -35,13 +35,14 @@ Today's list is only for doing: one ordered list of today's todos. Things that r
 
 A produced todo with a time notifies at that time while Miller is open in a tab (a notice, plus a browser notification if allowed). Web push to a closed tab is not built yet: it needs VAPID keys, a service worker and a push sender.
 
-Meetings come from calendars synced by [Recall.ai](https://docs.recall.ai/docs/calendar-v2-integration-guide) and are listed as read-only todos (`kind=meeting`) after the user's own, for today only and until they end: a thread and comments, no rename/close/delete. Signed-in users connect one or more Google or Outlook calendars in Settings; their own Google address is suggested first.
+Meetings come from the user's Google and Outlook calendars, read directly through the Google Calendar API and Microsoft Graph, and are listed as read-only todos (`kind=meeting`) after the user's own, for today only and until they end: a thread and comments, no rename/close/delete. Signed-in users connect one or more accounts in Settings (their own Google address is suggested first); each account's primary calendar is on, and its other calendars can be switched on one by one. An account whose access was revoked shows "lost access" with a Reconnect link.
 
-- `calendars/` connections, the OAuth consent flow, the Recall client and webhook, `sync_calendars` command.
-- Env: `RECALL_API_KEY`, `RECALL_API_BASE` (your Recall region, default `https://us-east-1.recall.ai`), `RECALL_WEBHOOK_SECRET`; Google reuses `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`; Outlook needs `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET`.
-- Google console: enable the Calendar API, add the `calendar.events.readonly` scope to the consent screen, and add the redirect URI `<SITE_URL>/calendars/google/callback/`. Azure app: redirect URI `<SITE_URL>/calendars/microsoft/callback/`, delegated `Calendars.Read` + `offline_access`.
-- Recall dashboard: webhook endpoint `<SITE_URL>/calendars/webhook/` for `calendar.sync_events` and `calendar.update`; its signing secret is `RECALL_WEBHOOK_SECRET`.
-- Optional fallback for missed webhooks: run `python manage.py sync_calendars` on a schedule.
+- `calendars/` connections and their calendars (`CalendarSource`), the OAuth consent flow, the Google/Graph clients (`calendar_api.py`), push webhooks, `sync_calendars` command. Each sync re-reads a calendar's next two weeks and makes the list match it; a push notification just triggers that re-read.
+- Env: `CALENDAR_TOKEN_KEY` (encrypts refresh tokens; make one with `uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` and never change it, or every account must reconnect); Google reuses `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`; Outlook needs `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET`.
+- Google console: enable the Calendar API; consent screen "In production" (in "Testing", refresh tokens die after 7 days), scopes `calendar.events` + `calendar.calendarlist.readonly` (sensitive: needs Google's app verification past 100 users); redirect URI `<SITE_URL>/calendars/google/callback/`.
+- Azure app: accounts in any org directory and personal Microsoft accounts (multi-tenant), redirect URI `<SITE_URL>/calendars/microsoft/callback/`, delegated `Calendars.ReadWrite` + `offline_access`, publisher verification for work accounts.
+- Push: Google and Graph only push to https. On an https `SITE_URL` each enabled calendar gets a channel to `<SITE_URL>/calendars/webhook/google/` or `/calendars/webhook/microsoft/`; nothing to register by hand. Locally (http) or if a provider refuses a channel, the scheduled sync keeps calendars fresh.
+- Run `python manage.py sync_calendars` every 15 minutes (`*/15 * * * *`): it renews push channels before they lapse (Google's last 7 days, Graph's about 3), picks up calendars added to an account, and catches missed pushes.
 - Scheduled todos: run `python manage.py produce_scheduled` every 15 minutes (`*/15 * * * *`). It puts what's due on each user's list just after their own midnight; safe to rerun. The board also does this on load.
 
 ## Docker

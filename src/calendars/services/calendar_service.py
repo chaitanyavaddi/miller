@@ -1,39 +1,38 @@
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+import hashlib
+import hmac
+import logging
+from datetime import timedelta
 
+from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import QuerySet
+from django.urls import reverse
 from django.utils import timezone
-from django.utils.dateparse import parse_datetime
 
-from calendars.models import CalendarConnection, CalendarEvent
+from calendars.models import CalendarConnection, CalendarEvent, CalendarSource
+from calendars.services.calendar_api import APIS, CalendarApiError, CalendarAuthError, MeetingFields, RemoteEvent
 from calendars.services.oauth_service import CalendarGrant, CalendarOAuthService
-from calendars.services.recall_service import RecallError, RecallService
+from calendars.services.token_vault import TokenVault
 from todos.models import Todo
-from todos.schemas import TITLE_MAX_LENGTH
 from todos.services import TodoService
 
-SYNC_LOOKBACK = timedelta(days=1)  # today's earlier meetings still show; older ones are never listed
+logger = logging.getLogger(__name__)
 
-
-@dataclass(frozen=True)
-class MeetingFields:
-    """What a calendar event becomes on the list."""
-    title: str
-    starts_at: datetime
-    ends_at: datetime
-    meeting_url: str
-    ical_uid: str
+SYNC_LOOKBACK = timedelta(days=1)    # today's earlier meetings still show; older ones are never listed
+SYNC_LOOKAHEAD = timedelta(days=14)  # meetings are listed on their day; two weeks is plenty of notice
+RENEW_BEFORE = timedelta(days=1)     # push channels are renewed when they'd lapse within this
+ACCESS_TOKEN_TTL = 50 * 60           # both providers issue hour-long access tokens
 
 
 class CalendarService:
     @staticmethod
     def connections_for(user) -> QuerySet:
-        return CalendarConnection.objects.filter(user=user)
+        return CalendarConnection.objects.filter(user=user).prefetch_related("sources")
 
     @staticmethod
     def can_connect(provider: str) -> bool:
-        return RecallService.is_configured() and CalendarOAuthService.is_configured(provider)
+        return TokenVault.is_configured() and CalendarOAuthService.is_configured(provider)
 
     @staticmethod
     def suggested_email(user) -> str:
@@ -43,18 +42,17 @@ class CalendarService:
         connected = CalendarService.connections_for(user).filter(provider=CalendarConnection.Provider.GOOGLE, email=user.email)
         return "" if connected.exists() else user.email
 
+    # Connecting
+
     @staticmethod
     def connect(user, provider: str, grant: CalendarGrant) -> CalendarConnection:
-        """Hand the calendar to Recall, remember it, show meetings and pull in what's on it."""
-        existing = CalendarService.connections_for(user).filter(provider=provider, email=grant.email).first()
-        if existing is not None:
-            return existing
-        config = CalendarOAuthService.config(provider)
-        created = RecallService.create_calendar(provider, config.client_id, config.client_secret, grant.refresh_token)
-        connection = CalendarConnection.objects.create(
-            user=user, provider=provider, email=grant.email, recall_id=created["id"],
-            status=CalendarService._status(created.get("status")),
+        """Remember the account (or take the new token, if it was connected before and lost access),
+        switch its primary calendar on, show meetings and pull in what's on it."""
+        connection, _ = CalendarConnection.objects.update_or_create(
+            user=user, provider=provider, email=grant.email,
+            defaults={"refresh_token": TokenVault.seal(grant.refresh_token), "status": CalendarConnection.Status.CONNECTED},
         )
+        cache.delete(CalendarService._token_key(connection))
         if not user.show_meetings:
             user.show_meetings = True
             user.save(update_fields=["show_meetings", "updated_at"])
@@ -63,53 +61,119 @@ class CalendarService:
 
     @staticmethod
     def disconnect(connection: CalendarConnection) -> None:
-        """Stop syncing and take the calendar's meetings off the list (a meeting another connected
-        calendar also has stays)."""
+        """Stop the push channels, give the token back and take the account's meetings off the list
+        (a meeting another connected calendar also has stays). The provider being unreachable or the
+        token already dead doesn't stop it: it's forgotten here either way."""
+        api = APIS[connection.provider]
         try:
-            RecallService.delete_calendar(connection.recall_id)
-        except RecallError:
-            pass  # already gone on Recall's side, or unreachable: forget it here either way
+            token = CalendarService.access_token(connection)
+            for source in connection.sources.exclude(channel_id=""):
+                CalendarService._unwatch(token, source)
+            api.revoke(TokenVault.open(connection.refresh_token))
+        except CalendarApiError:
+            pass
         with transaction.atomic():
-            for event in list(connection.events.select_related("meeting")):
+            for event in CalendarEvent.objects.filter(source__connection=connection).select_related("meeting"):
                 CalendarService._unlink(event)
             connection.delete()
+        cache.delete(CalendarService._token_key(connection))
 
     @staticmethod
-    def sync(connection: CalendarConnection, updated_since: datetime | None = None) -> None:
-        """Apply the calendar's events from yesterday on (only those changed since `updated_since`, if
-        given). Days are counted in the owner's zone, wherever this runs."""
-        now = timezone.now()
-        with timezone.override(connection.user.tzinfo):
-            for event in RecallService.events(connection.recall_id, now - SYNC_LOOKBACK, updated_since):
-                CalendarService.apply(connection, event)
-        connection.synced_at = now
+    def set_enabled(source: CalendarSource, enabled: bool) -> None:
+        """Switch one calendar of an account on (watch it and pull its meetings in) or off."""
+        if source.enabled == enabled:
+            return
+        source.enabled = enabled
+        source.save(update_fields=["enabled", "updated_at"])
+        token = CalendarService.access_token(source.connection)
+        if enabled:
+            CalendarService._ensure_channel(token, source)
+            CalendarService.sync_source(source, token)
+            return
+        CalendarService._unwatch(token, source)
+        with transaction.atomic():
+            for event in source.events.select_related("meeting"):
+                CalendarService._unlink(event)
+
+    # Syncing
+
+    @staticmethod
+    def access_token(connection: CalendarConnection) -> str:
+        """An access token for the account, cached for most of its hour. A refused refresh token
+        marks the connection disconnected, so Settings offers a reconnect."""
+        key = CalendarService._token_key(connection)
+        token = cache.get(key)
+        if token:
+            return token
+        refresh_token = TokenVault.open(connection.refresh_token)
+        try:
+            grant = CalendarOAuthService.refresh(connection.provider, refresh_token)
+        except CalendarAuthError:
+            CalendarService._mark(connection, CalendarConnection.Status.DISCONNECTED)
+            raise
+        if grant.refresh_token != refresh_token:
+            connection.refresh_token = TokenVault.seal(grant.refresh_token)
+            connection.save(update_fields=["refresh_token", "updated_at"])
+        cache.set(key, grant.access_token, ACCESS_TOKEN_TTL)
+        return grant.access_token
+
+    @staticmethod
+    def sync(connection: CalendarConnection) -> None:
+        """The whole account: its list of calendars, each enabled one's push channel, and their meetings."""
+        token = CalendarService.access_token(connection)
+        CalendarService.refresh_sources(connection, token)
+        for source in connection.sources.filter(enabled=True):
+            CalendarService._ensure_channel(token, source)
+            CalendarService.sync_source(source, token)
+        connection.synced_at = timezone.now()
         connection.save(update_fields=["synced_at", "updated_at"])
 
     @staticmethod
-    def refresh_status(connection: CalendarConnection) -> None:
-        status = CalendarService._status(RecallService.calendar(connection.recall_id).get("status"))
-        if status != connection.status:
-            connection.status = status
-            connection.save(update_fields=["status", "updated_at"])
+    def refresh_sources(connection: CalendarConnection, token: str) -> None:
+        """Mirror the account's calendars: new ones arrive switched off (except the primary one on
+        first connect), renamed ones follow, removed ones go with their meetings."""
+        remote = {calendar.external_id: calendar for calendar in APIS[connection.provider].calendars(token)}
+        first_time = not connection.sources.exists()
+        for source in list(connection.sources.all()):
+            calendar = remote.pop(source.external_id, None)
+            if calendar is None:
+                with transaction.atomic():
+                    for event in source.events.select_related("meeting"):
+                        CalendarService._unlink(event)
+                    source.delete()
+            elif (source.name, source.is_primary) != (calendar.name, calendar.is_primary):
+                source.name, source.is_primary = calendar.name, calendar.is_primary
+                source.save(update_fields=["name", "is_primary", "updated_at"])
+        for calendar in remote.values():
+            CalendarSource.objects.create(
+                connection=connection, external_id=calendar.external_id, name=calendar.name,
+                is_primary=calendar.is_primary, enabled=first_time and calendar.is_primary,
+            )
 
     @staticmethod
-    def handle_webhook(payload: dict) -> None:
-        """Recall's calendar webhooks: `calendar.sync_events` (events changed) and `calendar.update`
-        (the calendar itself, e.g. it lost access)."""
-        data = payload.get("data") or {}
-        connection = CalendarConnection.objects.filter(recall_id=data.get("calendar_id", "")).select_related("user").first()
-        if connection is None:
-            return
-        if payload.get("event") == "calendar.sync_events":
-            CalendarService.sync(connection, parse_datetime(data.get("last_updated_ts") or "") or None)
-        elif payload.get("event") == "calendar.update":
-            CalendarService.refresh_status(connection)
+    def sync_source(source: CalendarSource, token: str | None = None) -> None:
+        """Re-read the calendar's window and make the list match it: new and changed events are
+        applied, events no longer in it come off. Days are counted in the owner's zone, wherever this runs."""
+        connection = source.connection
+        token = token or CalendarService.access_token(connection)
+        now = timezone.now()
+        start, end = now - SYNC_LOOKBACK, now + SYNC_LOOKAHEAD
+        seen = set()
+        with timezone.override(connection.user.tzinfo):
+            for event in APIS[connection.provider].events(token, source.external_id, start, end):
+                CalendarService.apply(source, event)
+                seen.add(event.external_id)
+            gone = (source.events.filter(meeting__starts_at__gte=start, meeting__starts_at__lt=end)
+                    .exclude(external_id__in=seen).select_related("meeting"))
+            with transaction.atomic():
+                for event in gone:
+                    CalendarService._unlink(event)
 
     @staticmethod
     @transaction.atomic
-    def apply(connection: CalendarConnection, event: dict) -> None:
-        fields = CalendarService.meeting_fields(event)
-        linked = CalendarEvent.objects.filter(recall_id=event.get("id", "")).select_related("meeting").first()
+    def apply(source: CalendarSource, event: RemoteEvent) -> None:
+        fields = event.fields
+        linked = source.events.filter(external_id=event.external_id).select_related("meeting").first()
         if fields is None:
             if linked is not None:
                 CalendarService._unlink(linked)
@@ -117,33 +181,68 @@ class CalendarService:
         if linked is not None:
             CalendarService._update(linked.meeting, fields)
             return
-        meeting = CalendarService._twin(connection.user, fields) or CalendarService._create(connection.user, fields)
-        CalendarEvent.objects.create(connection=connection, meeting=meeting, recall_id=event["id"], ical_uid=fields.ical_uid)
+        user = source.connection.user
+        meeting = CalendarService._twin(user, fields) or CalendarService._create(user, fields)
+        CalendarEvent.objects.create(source=source, meeting=meeting, external_id=event.external_id, ical_uid=fields.ical_uid)
+
+    # Push channels
 
     @staticmethod
-    def meeting_fields(event: dict) -> MeetingFields | None:
-        """None for anything that shouldn't be on the list: deleted, cancelled, declined or all-day."""
-        starts_at = parse_datetime(event.get("start_time") or "")
-        ends_at = parse_datetime(event.get("end_time") or "")
-        raw = event.get("raw") or {}
-        if event.get("is_deleted") or starts_at is None or ends_at is None:
+    def webhook_address(provider: str) -> str:
+        return settings.SITE_URL + reverse("calendars:webhook", args=[provider])
+
+    @staticmethod
+    def channel_secret(channel_id: str) -> str:
+        """What a channel's pushes must carry (Google's channel token, Graph's clientState). Derived,
+        not stored: only we can make it."""
+        return hmac.new(settings.SECRET_KEY.encode(), f"calendar-channel:{channel_id}".encode(), hashlib.sha256).hexdigest()
+
+    @staticmethod
+    def source_for_push(provider: str, channel_id: str = "", resource: str = "", secret: str = "") -> CalendarSource | None:
+        """The enabled source a push is about, if its secret checks out."""
+        found = CalendarSource.objects.filter(connection__provider=provider, enabled=True)
+        found = found.filter(channel_id=channel_id) if channel_id else found.filter(channel_resource=resource)
+        source = found.select_related("connection__user").first() if (channel_id or resource) else None
+        if source is None or not source.channel_id:
             return None
-        if event.get("platform") == "microsoft_outlook":
-            title = raw.get("subject")
-            skip = raw.get("isAllDay") or raw.get("isCancelled") or (raw.get("responseStatus") or {}).get("response") == "declined"
-        else:
-            title = raw.get("summary")
-            declined = any(a.get("self") and a.get("responseStatus") == "declined" for a in raw.get("attendees") or [])
-            skip = "date" in (raw.get("start") or {}) or raw.get("status") == "cancelled" or declined
-        if skip:
+        if not hmac.compare_digest(CalendarService.channel_secret(source.channel_id), secret or ""):
             return None
-        return MeetingFields(
-            title=((title or "").strip() or "Untitled meeting")[:TITLE_MAX_LENGTH],
-            starts_at=starts_at,
-            ends_at=ends_at,
-            meeting_url=(event.get("meeting_url") or "")[:1000],
-            ical_uid=(event.get("ical_uid") or "")[:1024],
-        )
+        return source
+
+    @staticmethod
+    def _ensure_channel(token: str, source: CalendarSource) -> None:
+        """Open a push channel for the source, or renew one about to lapse. Providers only push to
+        https; elsewhere (and if the provider refuses) the scheduled sync is what keeps it fresh."""
+        if not settings.SITE_URL.startswith("https://"):
+            return
+        api, address = APIS[source.connection.provider], CalendarService.webhook_address(source.connection.provider)
+        if source.channel_id and source.channel_expires_at and source.channel_expires_at > timezone.now() + RENEW_BEFORE:
+            return
+        try:
+            if source.channel_id:
+                try:
+                    channel = api.renew(token, source, address, CalendarService.channel_secret)
+                except CalendarApiError:
+                    channel = api.watch(token, source, address, CalendarService.channel_secret)  # the old one is gone: start over
+            else:
+                channel = api.watch(token, source, address, CalendarService.channel_secret)
+        except CalendarApiError as error:
+            logger.warning("No push channel for %s: %s", source, error)
+            return
+        source.channel_id, source.channel_resource, source.channel_expires_at = channel.channel_id, channel.resource, channel.expires_at
+        source.save(update_fields=["channel_id", "channel_resource", "channel_expires_at", "updated_at"])
+
+    @staticmethod
+    def _unwatch(token: str, source: CalendarSource) -> None:
+        if source.channel_id:
+            try:
+                APIS[source.connection.provider].unwatch(token, source)
+            except CalendarApiError:
+                pass  # already lapsed or gone: nothing to stop
+        source.channel_id, source.channel_resource, source.channel_expires_at = "", "", None
+        source.save(update_fields=["channel_id", "channel_resource", "channel_expires_at", "updated_at"])
+
+    # Meetings
 
     @staticmethod
     def _twin(user, fields: MeetingFields) -> Todo | None:
@@ -177,5 +276,11 @@ class CalendarService:
             meeting.delete()  # it left every calendar it was on; its thread goes with it
 
     @staticmethod
-    def _status(raw: str | None) -> str:
-        return raw if raw in CalendarConnection.Status.values else CalendarConnection.Status.CONNECTING
+    def _mark(connection: CalendarConnection, status: str) -> None:
+        if connection.status != status:
+            connection.status = status
+            connection.save(update_fields=["status", "updated_at"])
+
+    @staticmethod
+    def _token_key(connection: CalendarConnection) -> str:
+        return f"calendar-access-token:{connection.pk}"
