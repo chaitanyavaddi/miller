@@ -310,7 +310,7 @@ class SettingsTests(TestCase):
 
     def test_the_signed_in_google_calendar_is_suggested_first(self):
         response = self.client.get(reverse("board:settings"))
-        self.assertContains(response, "Connect <b>s@x.com</b>")
+        self.assertContains(response, "The Google account you signed in with.")
         self.assertContains(response, "hint=s%40x.com")
 
     def test_turning_meetings_on_refreshes_the_board(self):

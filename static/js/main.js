@@ -76,6 +76,22 @@
     }).catch(() => {});
   }
 
+  /* Settings re-renders whole on every save: the sections that were open stay open. Remembered
+   * only while the overlay shows settings; closing it forgets. */
+  const overlayEl = document.getElementById('overlay');
+  let openGroups = null;
+  if (overlayEl) {
+    overlayEl.addEventListener('toggle', e => {
+      if (!e.target.matches('.settings__group')) return;
+      openGroups = [...overlayEl.querySelectorAll('.settings__group[open]')].map(g => g.dataset.group);
+    }, true);
+    new MutationObserver(() => {
+      const groups = overlayEl.querySelectorAll('.settings__group');
+      if (!groups.length) { openGroups = null; return; }
+      if (openGroups) groups.forEach(g => { g.open = openGroups.includes(g.dataset.group); });
+    }).observe(overlayEl, { childList: true });
+  }
+
   /* Sent by the server (HX-Trigger) or by another script once the overlay has done its job. */
   document.addEventListener('overlay-close', closeOverlay);
 

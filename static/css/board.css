@@ -27,46 +27,48 @@
 .thread__join { margin-left: auto; margin-right: 12px; }
 
 /* — settings modal: a narrow column of plain sections, like the rest of the board — */
-/* — settings: All todos' frame (720 wide, fixed height, label + ✕ on top), then rows of a label on
-     the left and its setting on the right. One rhythm: 36px lines, 32px between rows. — */
+/* — settings: All todos' frame (720 wide, fixed height, label + ✕ on top), then numbered sections
+     that fold. The number hangs in the margin (44px + 14px, a todo row's position column), so
+     headings and rows share one left edge. Each row: what it is on the left, its control on the
+     right, a hairline between rows. — */
 .settings { position: relative; max-width: 720px; width: 100%; height: min(680px, calc(100vh - 96px)); display: flex; flex-direction: column; background: var(--bg); padding: 8px 0; }
-.settings__body { margin-top: 24px; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 12px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-.settings__notice { margin-bottom: 24px; font-size: 13px; color: var(--text); }
-.settings__row { display: grid; grid-template-columns: 160px minmax(0, 1fr); column-gap: 32px; }
-.settings__row + .settings__row { margin-top: 32px; }
-.settings__label { margin: 0; font-size: 13px; line-height: 36px; font-weight: 400; color: var(--text-4); }
-.settings__value { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
-.settings__line { font-size: 13.5px; line-height: 36px; color: var(--text); }
-.settings__hint { margin-top: 4px; font-size: 12.5px; line-height: 20px; color: var(--text-4); max-width: 52ch; }
-.settings__action { padding: 0; }
-.settings__select { appearance: none; -webkit-appearance: none; height: 36px; margin: 0; font: inherit; font-size: 13.5px; color: var(--text); background: transparent; border: none;
-  padding: 0; max-width: 100%; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 4px; }
-.settings__toggle { display: flex; align-items: center; gap: 10px; min-height: 36px; font-size: 13.5px; color: var(--text); cursor: pointer; }
-.settings__toggle input { margin: 0; accent-color: var(--text); }
-.settings__meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); flex: none; }
-.settings__value > .shortcuts { padding-top: 8px; }  /* its 20px lines, centred on the label's 36px line */
+.settings__body { margin-top: 24px; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 12px 0 58px; margin-left: -58px; counter-reset: settings;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.settings__notice { margin-bottom: 16px; font-size: 13px; line-height: 20px; color: var(--text); }
 
-/* Calendars: each account a heading line with its calendars beneath, then the ways to add one. */
-.settings__account { width: 100%; }
-.settings__account + .settings__account { margin-top: 12px; }
-.settings__account-head { display: flex; align-items: center; gap: 12px; height: 36px; }
-.settings__account-email { font-size: 13.5px; font-weight: 500; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.settings__account-actions { margin-left: auto; display: flex; align-items: center; gap: 16px; flex: none; }
-.settings__account-actions > .text-btn { display: inline-flex; align-items: center; height: 20px; }
-.settings__source .settings__toggle { color: var(--text-3); }
-.settings__add { width: 100%; display: flex; flex-direction: column; }
-.settings__account + .settings__add { margin-top: 12px; }
-.settings__add-link { display: flex; align-items: center; gap: 10px; height: 36px; color: var(--text-3); text-decoration: none; }
-.settings__add-link:hover { color: var(--text); }
-.settings__add-link:hover .settings__add-text { text-decoration: underline dotted; text-underline-offset: 4px; }
-.settings__plus { font-family: var(--font-mono); font-size: 13px; color: var(--text-4); width: 13px; flex: none; }
-.settings__add-text { font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.settings__add-text b { font-weight: 500; color: var(--text); }
-.settings__add-link .settings__meta { margin-left: auto; }
+.settings__group { counter-increment: settings; border-bottom: 1px solid var(--border); }
+.settings__summary { display: flex; align-items: center; height: 56px; cursor: pointer; list-style: none; }
+.settings__summary::-webkit-details-marker { display: none; }
+.settings__heading { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-3); }
+.settings__heading::before { content: counter(settings, decimal-leading-zero); display: inline-block; width: 58px; margin-left: -58px; vertical-align: baseline;
+  font-family: var(--font-mono); font-size: 10.5px; line-height: 1; font-weight: 400; letter-spacing: 0; color: var(--text-4); }
+.settings__group[open] .settings__heading, .settings__summary:hover .settings__heading { color: var(--text); }
+.settings__chevron { margin-left: auto; color: var(--text-4); transition: transform 0.15s ease; }
+.settings__group[open] .settings__chevron { transform: rotate(180deg); }
+.settings__summary:hover .settings__chevron { color: var(--text); }
+.settings__group[open] { padding-bottom: 8px; }
+
+.settings__row { display: flex; align-items: center; gap: 32px; min-height: 64px; padding: 14px 0; border-top: 1px solid var(--border); }
+.settings__about { flex: 0 1 340px; min-width: 0; }  /* a narrow left column: the right side holds only controls */
+.settings__label { font-size: 13.5px; line-height: 20px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings__hint { margin-top: 2px; font-size: 12.5px; line-height: 18px; color: var(--text-4); }
+.settings__control { flex: none; margin-left: auto; display: flex; align-items: center; gap: 16px; }
+.settings__control > .text-btn { display: inline-flex; align-items: center; height: 20px; }
+.settings__select { appearance: none; -webkit-appearance: none; height: 20px; margin: 0; font: inherit; font-size: 13.5px; color: var(--text); background: transparent; border: none;
+  padding: 0; text-align: right; text-align-last: right; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 4px; }
+.settings__check { margin: 0; width: 14px; height: 14px; accent-color: var(--text); cursor: pointer; }
+
+/* A connected account's calendars and the shortcuts are lighter rows: no hint, a shorter line. */
+.settings__row--calendar { border-top-style: dotted; }  /* belongs to the account above it */
+.settings__row--calendar .settings__label { color: var(--text-3); }
+.settings__row--key { min-height: 44px; padding: 12px 0; }
+.settings__keys { display: flex; gap: 6px; flex: none; }
+.settings__keys kbd { min-width: 16px; text-align: center; font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
 
 @media (max-width: 760px) {
-  .settings__row { grid-template-columns: minmax(0, 1fr); }
-  .settings__label { line-height: 20px; }
+  .settings__body { padding-left: 32px; margin-left: -32px; }
+  .settings__heading::before { width: 32px; margin-left: -32px; }
+  .settings__row { gap: 16px; }
 }
 
 /* — Timeline: one modal, two tabs — Past (every todo, the most recently closed first)
