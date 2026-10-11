@@ -8,7 +8,6 @@ from django.utils import timezone
 from todos.models import Todo
 from todos.schemas import ReviewPeriod
 
-WEEKS_SHOWN_ALL_TIME = 12
 
 
 @dataclass(frozen=True)
@@ -17,14 +16,6 @@ class Window:
     end: datetime
     previous_start: datetime | None = None
     previous_end: datetime | None = None
-
-
-@dataclass(frozen=True)
-class Bucket:
-    start: date
-    label: str
-    count: int | None  # None: still in the future
-    is_current: bool
 
 
 @dataclass(frozen=True)
@@ -43,7 +34,6 @@ class Insights:
     streak: int
     longest_wait: LongestWait | None
     best_week: int | None
-    buckets: list[Bucket]
 
     @property
     def delta(self) -> int | None:
@@ -91,7 +81,6 @@ class InsightsService:
             streak=InsightsService._streak(set(close_days)),
             longest_wait=InsightsService._longest_wait(in_window),
             best_week=InsightsService._best_week(close_days) if period == ReviewPeriod.ALL else None,
-            buckets=InsightsService._buckets(period, window, Counter(close_days)),
         )
 
     @staticmethod
@@ -126,29 +115,3 @@ class InsightsService:
     def _best_week(close_days: list[date]) -> int | None:
         weeks = Counter(day - timedelta(days=day.weekday()) for day in close_days)
         return max(weeks.values(), default=None)
-
-    @staticmethod
-    def _buckets(period: str, window: Window, per_day: Counter) -> list[Bucket]:
-        today = timezone.localdate()
-        if period == ReviewPeriod.ALL:
-            this_week = today - timedelta(days=today.weekday())
-            starts = [this_week - timedelta(weeks=n) for n in reversed(range(WEEKS_SHOWN_ALL_TIME))]
-            return [
-                Bucket(start=start, label=f"{start:%b} {start.day}", is_current=start == this_week,
-                       count=sum(per_day[start + timedelta(days=d)] for d in range(7)))
-                for start in starts
-            ]
-        first = window.start.date()
-        days = 7 if period == ReviewPeriod.WEEK else InsightsService._days_in_month(first)
-        buckets = []
-        for offset in range(days):
-            day = first + timedelta(days=offset)
-            label = f"{day:%a}"[:1] if period == ReviewPeriod.WEEK else str(day.day)
-            buckets.append(Bucket(start=day, label=label, is_current=day == today,
-                                  count=None if day > today else per_day[day]))
-        return buckets
-
-    @staticmethod
-    def _days_in_month(first: date) -> int:
-        next_month = (first.replace(day=28) + timedelta(days=4)).replace(day=1)
-        return (next_month - first).days

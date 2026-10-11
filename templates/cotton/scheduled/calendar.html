@@ -1,0 +1,16 @@
+<c-vars months draft="" />
+{% for month in months %}
+<div class="popover__month" data-month-pane{% if not month.shown %} hidden{% endif %}>
+  <div class="popover__month-head">
+    <button type="button" class="popover__nav" data-month-step="-1" aria-label="Previous month"{% if forloop.first %} disabled{% endif %}>‹</button>
+    <span class="popover__title">{{ month.title }}</span>
+    <button type="button" class="popover__nav" data-month-step="1" aria-label="Next month"{% if forloop.last %} disabled{% endif %}>›</button>
+  </div>
+  <div class="popover__grid">
+    <span class="popover__head">M</span><span class="popover__head">T</span><span class="popover__head">W</span><span class="popover__head">T</span><span class="popover__head">F</span><span class="popover__head">S</span><span class="popover__head">S</span>
+    {% for blank in month.lead %}<span></span>{% endfor %}
+    {% for day in month.days %}<button type="button" class="popover__day{% if day.on %} is-on{% endif %}{% if day.today %} is-today{% endif %}"{% if not day.enabled %} disabled{% endif %}
+      data-pick-date="{{ day.value }}">{{ day.label }}</button>{% endfor %}
+  </div>
+</div>
+{% endfor %}

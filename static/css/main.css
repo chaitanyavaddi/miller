@@ -84,22 +84,6 @@ a.text-btn { display: inline-block; }
 .composer__hint { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); flex: none; display: none; }
 .composer__input:not(:placeholder-shown) ~ .composer__hint { display: inline; }
 
-/* — reminder: the composer's bell, the chip for the time it chose, and the preset menu — */
-.composer__bell { flex: none; width: 24px; height: 40px; padding: 0; background: none; border: none; cursor: pointer; color: var(--text-4); display: flex; align-items: center; justify-content: center; opacity: 0; }
-.composer:hover .composer__bell, .composer:focus-within .composer__bell, .composer__bell[aria-expanded="true"] { opacity: 1; }
-.composer__bell:hover { color: var(--text); }
-.composer__reminder { flex: none; display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; color: var(--text); }
-.composer__reminder[hidden] { display: none; }
-.composer__reminder-clear { background: none; border: none; padding: 0; width: 16px; height: 20px; cursor: pointer; color: var(--text-4); display: flex; align-items: center; justify-content: center; }
-.composer__reminder-clear:hover { color: var(--text); }
-.composer:has(.composer__reminder:not([hidden])) .composer__bell { display: none; }
-.remind-menu { position: fixed; z-index: 25; min-width: 220px; display: flex; flex-direction: column; padding: 6px 0; background: var(--bg); border: 1px solid var(--border); box-shadow: 0 6px 24px rgba(38, 37, 30, 0.08); }
-.remind-menu[hidden] { display: none; }
-.remind-menu__item { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 32px; padding: 0 14px; background: none; border: none; cursor: pointer; font-size: 13px; color: var(--text-3); text-align: left; }
-.remind-menu__item:hover, .remind-menu__item:focus-visible { color: var(--text); background: rgba(38, 37, 30, 0.04); outline: none; }
-.remind-menu__hint { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }
-.remind-menu__pick { margin: 4px 14px 6px; border: none; border-bottom: 1px dotted var(--text-4); background: transparent; font-family: var(--font-mono); font-size: 11px; color: var(--text); padding: 4px 0; }
-
 /* — form messages — */
 .form-messages { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .form-message { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }

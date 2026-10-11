@@ -19,3 +19,10 @@ class TodoPermissionRequiredMixin(SignedInRequiredMixin):
         if self.permission_required and not request.user.has_perm(self.permission_required, self.todo):
             raise PermissionDenied(f"Missing permission: {self.permission_required}")
         return super().dispatch(request, *args, **kwargs)
+
+
+class LiveTodoMixin:
+    """For what still works on a todo once it's done: reading its thread, renaming, commenting."""
+
+    def get_todo_queryset(self):
+        return TodoService.live_queryset()

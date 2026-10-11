@@ -1,10 +1,11 @@
-/* — the board: the list on the left, filed by day; the selected todo's thread on the right — */
+/* — the board: the todo list on the left, the selected todo's thread always on the right — */
 .board { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); column-gap: 56px; }
 .board__pane { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; }
 .pane-bar { display: flex; align-items: center; justify-content: space-between; height: 20px; padding-right: 12px; flex: none; }
 
 .thread__crumb { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; }
 .thread__crumb-strong { font-weight: 400; color: var(--text); }
+.thread__done--on { color: var(--text); }  /* the thread's tick, set: click it and it's not done */
 .thread__heading { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding-right: 12px; flex: none; }
 .thread__heading:hover .icon-btn--quiet { opacity: 1; }
 .thread__done { justify-content: flex-end; }
@@ -23,14 +24,6 @@
 .thread__empty-title { color: var(--text-3); }
 .thread__empty-sub { margin-top: 4px; }
 
-/* — reminder: a quiet line under the title, only once there is one. Set from the composer's bell or
-     the bell by the title; the time itself reopens the presets. — */
-.reminder { display: flex; align-items: center; gap: 12px; padding-right: 12px; flex: none; }
-.reminder__form { display: flex; align-items: center; gap: 8px; color: var(--text-4); }
-.reminder__form:has(.reminder__when) { margin-top: 10px; }
-.reminder__when { background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
-.reminder__when:hover { color: var(--text); text-decoration: underline dotted; text-underline-offset: 3px; }
-.reminder .form-messages { margin: 6px 0 0; }
 .thread__join { margin-left: auto; margin-right: 12px; }
 
 /* — settings modal: a narrow column of plain sections, like the rest of the board — */
@@ -56,7 +49,7 @@
 .settings__more { display: flex; align-items: center; gap: 14px; }
 .settings__more-label { font-size: 13px; color: var(--text-4); }
 
-/* — review modal: filters, what the period adds up to, an ink chart, every todo in a table — */
+/* — review modal: filters, what the period adds up to, every todo in a table — */
 /* Fixed height: switching between the table and a thread never moves anything above it. */
 .review { position: relative; max-width: 720px; width: 100%; height: min(680px, calc(100vh - 96px)); display: flex; flex-direction: column; gap: 24px; background: var(--bg); padding: 8px 0; }
 .review__filters { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
@@ -72,14 +65,6 @@
 .review__facts { font-size: 13px; line-height: 1.6; color: var(--text-3); }
 .review__facts:empty { display: none; }
 
-.review-chart { width: 100%; height: auto; display: block; overflow: visible; }
-.review-chart__baseline { stroke: var(--border); stroke-width: 1; }
-.review-chart__hit { fill: transparent; }
-.review-chart__bar { fill: var(--text); }
-.review-chart__slot:hover .review-chart__bar { fill: #000; }
-.review-chart__value, .review-chart__label { font-family: var(--font-mono); font-size: 10px; fill: var(--text-4); }
-.review-chart__value { fill: var(--text); }
-.review-chart__slot--current .review-chart__label { fill: var(--text); }
 
 .review__body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .review__table-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 12px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }

@@ -9,6 +9,6 @@
     <h2 class="review-thread__title">{{ row.title }}</h2>
   </div>
   <div class="review-thread__comments">
-    {% for comment in comments %}<c-comments.comment :comment="comment" />{% empty %}<p class="review__empty">No comments on this one.</p>{% endfor %}
+    {% for comment in comments %}<c-comments.comment :comment="comment" />{% empty %}<p class="review__empty">No updates on this one.</p>{% endfor %}
   </div>
 </div>

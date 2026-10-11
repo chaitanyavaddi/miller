@@ -1,13 +1,17 @@
-<c-vars current comments presets="" focus="" />
+<c-vars current comments focus="" />
 <article class="board__pane thread" id="thread" aria-label="Thread">
 {% if current %}
   <div class="pane-bar">
     {% if current.is_meeting %}
-    <span class="thread__crumb"><b class="thread__crumb-strong">Meeting</b> · {{ current.day_name }}{% if current.span %} · {{ current.span }}{% endif %}</span>
+    <span class="thread__crumb"><b class="thread__crumb-strong">Meeting</b>{% if current.span %} · {{ current.span }}{% endif %}</span>
     {% if current.meeting_url %}<a class="text-btn text-btn--small thread__join" href="{{ current.meeting_url }}" target="_blank" rel="noopener">Join</a>{% endif %}
     {% else %}
-    <span class="thread__crumb"><b class="thread__crumb-strong">#{{ current.position }} {{ current.day_name }}</b> · {{ current.days_on_list }}</span>
+    <span class="thread__crumb">{% if current.is_done %}<b class="thread__crumb-strong">Done today</b>{% else %}<b class="thread__crumb-strong">#{{ current.position }} today</b>{% endif %}{% if current.schedule_label %} · {{ current.schedule_label }}{% elif current.from_schedule %} · from scheduled{% endif %}{% if current.shows_age %} · {{ current.added }}{% endif %}</span>
+    {% if current.is_done %}
+    <c-ui.icon-button label="Done — mark not done" title="Not done" class="icon-btn--small thread__done thread__done--on" hx-post="{% url 'board:todo-reopen' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML"><c-ui.icon name="check" size="14" sw="2" /></c-ui.icon-button>
+    {% else %}
     <c-ui.icon-button label="Mark done" title="Mark done" class="icon-btn--small thread__done" hx-post="{% url 'board:todo-close' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML"><c-ui.icon name="check" size="14" sw="1.8" /></c-ui.icon-button>
+    {% endif %}
     {% endif %}
   </div>
   <div class="thread__heading">
@@ -15,16 +19,14 @@
     <h1 class="thread__title" title="From your calendar · read only">{{ current.title }}</h1>
     {% else %}
     <c-todos.title-form :todo="current" />
-    {% if not current.remind_label %}<c-ui.icon-button label="Remind me" title="Remind me" class="icon-btn--small icon-btn--quiet" data-action="remind-open" data-remind-for="remind-form" aria-haspopup="menu"><c-ui.icon name="bell" size="14" sw="1.6" /></c-ui.icon-button>{% endif %}
     <c-ui.icon-button label="Delete todo" title="Delete" class="icon-btn--small icon-btn--quiet" hx-post="{% url 'board:todo-delete' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML"><c-ui.icon name="trash" size="14" sw="1.6" /></c-ui.icon-button>
     {% endif %}
   </div>
-  {% if not current.is_meeting %}<c-todos.reminder-form :row="current" :presets="presets" />{% endif %}
   <div class="thread__comments">
     {% for comment in comments %}<c-comments.comment :comment="comment" />{% empty %}
     <div class="thread__empty">
-      <p class="thread__empty-title">No comments yet.</p>
-      <p class="thread__empty-sub">Start the thread below. Notes, links, files, anything.</p>
+      <p class="thread__empty-title">No updates yet.</p>
+      <p class="thread__empty-sub">Add one below: notes, links, files, anything.</p>
     </div>
     {% endfor %}
   </div>

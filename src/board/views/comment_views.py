@@ -3,11 +3,11 @@ from django.views import View
 from board.mixins import BoardResponseMixin
 from comments.schemas import CommentCreateSchema
 from comments.service import CommentService
-from todos.mixins import TodoPermissionRequiredMixin
+from todos.mixins import LiveTodoMixin, TodoPermissionRequiredMixin
 from utils.view_helper import render_fragment, retarget
 
 
-class CommentCreateView(TodoPermissionRequiredMixin, BoardResponseMixin, View):
+class CommentCreateView(LiveTodoMixin, TodoPermissionRequiredMixin, BoardResponseMixin, View):
     permission_required = "todos.comment_todo"
 
     def post(self, request, pk):

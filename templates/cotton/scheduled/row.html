@@ -1,0 +1,21 @@
+<c-vars row="" weekdays="" />
+{# One scheduled todo: its state lives in its data-* and title box, saved only by Save. Blank, it's the template for a new one. #}
+<div class="todo-row scheduled-row" data-row data-id="{{ row.id|default:'' }}"
+     data-rhythm="{{ row.rhythm|default:'' }}" data-on-date="{{ row.on_date|default:'' }}" data-weekdays="{{ row.weekdays|default:'' }}" data-month-day="{{ row.month_day|default:'' }}">
+  <div class="scheduled-row__title">
+    <input type="text" class="scheduled-row__input" value="{{ row.title|default:'' }}" maxlength="300" autocomplete="off" aria-label="Title" placeholder="Name it">
+  </div>
+  <div class="scheduled-row__when">
+    <button type="button" class="scheduled-chip{% if not row %} scheduled-chip--empty{% endif %}" data-pop="rhythm" aria-haspopup="menu"><span data-label="rhythm">{{ row.rhythm|default:'when' }}</span><span class="scheduled-chip__caret" aria-hidden="true">▾</span></button>
+    <span class="scheduled-row__detail">
+      <button type="button" class="scheduled-chip{% if not row.date_label %} scheduled-chip--empty{% endif %}" data-pop="date" data-detail="once" aria-haspopup="dialog"{% if row.rhythm != "once" %} hidden{% endif %}><span data-label="date">{{ row.date_label|default:'date' }}</span><span class="scheduled-chip__caret" aria-hidden="true">▾</span></button>
+      <span class="scheduled-days" data-detail="weekly"{% if row.rhythm != "weekly" %} hidden{% endif %}>
+        {% for day in weekdays %}<button type="button" class="scheduled-days__day" data-weekday="{{ day.value }}" title="{{ day.name }}" aria-label="{{ day.name }}" aria-pressed="false">{{ day.label }}</button>{% endfor %}
+      </span>
+      <button type="button" class="scheduled-chip{% if not row.day_label %} scheduled-chip--empty{% endif %}" data-pop="monthday" data-detail="monthly" aria-haspopup="dialog"{% if row.rhythm != "monthly" %} hidden{% endif %}><span data-label="monthday">{{ row.day_label|default:'day' }}</span><span class="scheduled-chip__caret" aria-hidden="true">▾</span></button>
+    </span>
+  </div>
+  <span class="todo-row__actions">
+    <button type="button" class="todo-row__action" data-remove aria-label="Remove" title="Remove"><c-ui.icon name="trash" size="13" sw="1.6" /></button>
+  </span>
+</div>

@@ -1,17 +1,12 @@
 from django.conf import settings
 from django.db import models
-from django.utils import timezone
-
-
-def today():
-    return timezone.localdate()
 
 
 class Todo(models.Model):
-    """Everything on the list is a todo, filed under a `day` and ordered within it by `position`
-    (1..n per day, no gaps). A task the user wrote can carry a reminder; a meeting comes from a
-    connected calendar and is read-only. Closing and deleting set a timestamp instead of removing
-    the row, so Undo can put a todo back exactly where it was."""
+    """Everything on today's list is a todo. The user orders their tasks by `position` (1..n, no
+    gaps); today's meetings from a connected calendar sit after them by start time, read-only. A task
+    a scheduled item produced remembers where it came from and the day. Closing and
+    deleting set a timestamp instead of removing the row, so Undo can put a todo back where it was."""
 
     class Kind(models.TextChoices):
         TASK    = "task",    "Task"
@@ -24,9 +19,9 @@ class Todo(models.Model):
     user        = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="todos")
     kind        = models.CharField(max_length=20, choices=Kind.choices, default=Kind.TASK)
     title       = models.CharField(max_length=300)
-    day         = models.DateField(default=today)
     position    = models.PositiveIntegerField(default=0)
-    remind_at   = models.DateTimeField(null=True, blank=True)
+    scheduled_item = models.ForeignKey("scheduled.ScheduledItem", on_delete=models.SET_NULL, null=True, blank=True, related_name="produced_todos")
+    produced_on = models.DateField(null=True, blank=True)       # the day a scheduled item produced it
     starts_at   = models.DateTimeField(null=True, blank=True)   # meetings only
     ends_at     = models.DateTimeField(null=True, blank=True)   # meetings only
     meeting_url = models.URLField(max_length=1000, blank=True)  # meetings only
@@ -36,8 +31,8 @@ class Todo(models.Model):
     updated_at  = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["day", "position", "id"]
-        indexes = [models.Index(fields=["user", "closed_at", "day", "position"])]
+        ordering = ["position", "id"]
+        indexes = [models.Index(fields=["user", "closed_at", "position"])]
 
     def __str__(self):
         return self.title
@@ -45,6 +40,8 @@ class Todo(models.Model):
     @property
     def is_meeting(self) -> bool:
         return self.kind == Todo.Kind.MEETING
+
+
 
 
 class PositionDay(models.Model):

@@ -17,6 +17,11 @@ class CommentService:
         return set(matches.values_list("todo_id", flat=True))
 
     @staticmethod
+    def note(todo, body: str) -> Comment:
+        """A line Miller writes into a thread itself, such as where a todo came from."""
+        return Comment.objects.create(todo=todo, body=body, automatic=True)
+
+    @staticmethod
     @transaction.atomic
     def add(todo, data) -> Comment:
         comment = Comment.objects.create(todo=todo, body=data.body)

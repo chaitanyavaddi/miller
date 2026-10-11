@@ -1,19 +1,10 @@
-<c-vars data="" reminder="" presets="" />
+<c-vars data="" />
 <div id="todo-form" class="todo-form">
   <c-ui.messages />
-  <form class="composer" data-remind-scope hx-post="{% url 'board:todo-create' %}" hx-include="#board-state" hx-target="#todo-form" hx-swap="outerHTML">
+  <form class="composer" hx-post="{% url 'board:todo-create' %}" hx-include="#board-state" hx-target="#todo-form" hx-swap="outerHTML">
     {% csrf_token %}
     <span class="composer__plus" aria-hidden="true">+</span>
     <input type="text" id="new-title" class="composer__input" name="title" aria-label="New todo" maxlength="300" placeholder="Add a todo" autocomplete="off" required value="{{ data.title|default:'' }}" aria-keyshortcuts="n" {% if data %}autofocus{% endif %}>
-    <input type="hidden" name="remind_preset" value="{{ reminder.preset|default:'' }}">
-    <input type="hidden" name="remind_at" value="{{ reminder.raw|default:'' }}">
-    <span class="composer__reminder" data-remind-chip{% if not reminder.preset and not reminder.raw %} hidden{% endif %}>
-      <c-ui.icon name="bell" size="12" sw="1.6" />
-      <span data-remind-chip-label>{% for preset in presets %}{% if preset.key == reminder.preset %}{{ preset.label }}{% endif %}{% endfor %}{% if not reminder.preset %}{{ reminder.raw|default:'' }}{% endif %}</span>
-      <button type="button" class="composer__reminder-clear" data-action="remind-clear" aria-label="No reminder" title="No reminder"><c-ui.icon name="x" size="10" sw="1.8" /></button>
-    </span>
     <span class="composer__hint">↵ Add</span>
-    <button type="button" class="composer__bell" data-action="remind-open" aria-label="Remind me" title="Remind me" aria-haspopup="menu"><c-ui.icon name="bell" size="13" sw="1.6" /></button>
-    <c-todos.remind-menu :presets="presets" />
   </form>
 </div>

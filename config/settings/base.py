@@ -16,6 +16,7 @@ INSTALLED_APPS = [
     "todos",
     "comments",
     "calendars",
+    "scheduled",
     "board",
 ]
 

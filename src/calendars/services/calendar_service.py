@@ -156,12 +156,10 @@ class CalendarService:
 
     @staticmethod
     def _create(user, fields: MeetingFields) -> Todo:
-        meeting = Todo.objects.create(
-            user=user, kind=Todo.Kind.MEETING, title=fields.title, day=timezone.localtime(fields.starts_at).date(),
+        return Todo.objects.create(
+            user=user, kind=Todo.Kind.MEETING, title=fields.title,
             starts_at=fields.starts_at, ends_at=fields.ends_at, meeting_url=fields.meeting_url,
         )
-        TodoService.slot_meeting(meeting)
-        return meeting
 
     @staticmethod
     def _update(meeting: Todo, fields: MeetingFields) -> None:
@@ -170,14 +168,13 @@ class CalendarService:
         meeting.ends_at     = fields.ends_at
         meeting.meeting_url = fields.meeting_url
         meeting.save(update_fields=["title", "starts_at", "ends_at", "meeting_url", "updated_at"])
-        TodoService.move_to_day(meeting, timezone.localtime(fields.starts_at).date())
 
     @staticmethod
     def _unlink(event: CalendarEvent) -> None:
         meeting = event.meeting
         event.delete()
         if not meeting.calendar_events.exists():
-            TodoService.drop_meeting(meeting)
+            meeting.delete()  # it left every calendar it was on; its thread goes with it
 
     @staticmethod
     def _status(raw: str | None) -> str:

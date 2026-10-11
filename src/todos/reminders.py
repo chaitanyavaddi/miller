@@ -1,57 +1,34 @@
-"""Reminder times as the list speaks them: a few presets, and how a time reads on a row or a thread.
-Everything is in the active time zone (the user's, via the middleware)."""
-from dataclasses import dataclass
-from datetime import datetime, time, timedelta
+"""How a todo's time reads. On the list it's as short as people think it: 6pm today, tmrw 7am,
+th 7am within the week, 23 oct further out (the time is in the thread). The thread says it
+exactly: 23 Oct 7am. Everything is in the active time zone (the user's, via the middleware)."""
+from datetime import datetime
 
 from django.utils import timezone
 
-EVENING = time(18, 0)
-MORNING = time(9, 0)
+WEEK_AHEAD = 6  # days ahead that still read as a weekday
 
 
 def clock(moment: datetime) -> str:
-    """9:30a, 12:00p."""
+    """7am, 12pm, 10:30am: minutes only when there are some."""
     local = timezone.localtime(moment)
-    return f"{local.hour % 12 or 12}:{local.minute:02d}{'a' if local.hour < 12 else 'p'}"
+    minutes = f":{local.minute:02d}" if local.minute else ""
+    return f"{local.hour % 12 or 12}{minutes}{'am' if local.hour < 12 else 'pm'}"
 
 
 def when(moment: datetime) -> str:
-    """Today · 6:00p, Tomorrow · 9:00a, Mon, Oct 12 · 9:00a."""
-    day = timezone.localtime(moment).date()
-    today = timezone.localdate()
-    if day == today:
-        name = "Today"
-    elif day == today + timedelta(days=1):
-        name = "Tomorrow"
-    else:
-        name = f"{day:%a}, {day:%b} {day.day}"
-    return f"{name} · {clock(moment)}"
+    """For a row: 6pm, tmrw 7am, th 7am, 23 oct."""
+    local = timezone.localtime(moment)
+    ahead = (local.date() - timezone.localdate()).days
+    if ahead == 0:
+        return clock(moment)
+    if ahead == 1:
+        return f"tmrw {clock(moment)}"
+    if 1 < ahead <= WEEK_AHEAD:
+        return f"{local:%a}"[:2].lower() + f" {clock(moment)}"
+    return f"{local.day} {local:%b}".lower()
 
 
-@dataclass(frozen=True)
-class ReminderPreset:
-    key: str
-    label: str
-    at: datetime
-
-    @property
-    def hint(self) -> str:
-        """The time for today's presets; the weekday for one that says its time already."""
-        local = timezone.localtime(self.at)
-        return clock(self.at) if local.date() == timezone.localdate() else f"{local:%a}"
-
-
-def presets(now: datetime | None = None) -> list[ReminderPreset]:
-    """In 1 hour; this evening, while it's still more than an hour off; tomorrow morning."""
-    now = timezone.localtime(now)
-    today = now.date()
-    options = [ReminderPreset("hour", "In 1 hour", (now + timedelta(hours=1)).replace(second=0, microsecond=0))]
-    evening = timezone.make_aware(datetime.combine(today, EVENING))
-    if evening - now > timedelta(hours=1):
-        options.append(ReminderPreset("evening", "This evening", evening))
-    options.append(ReminderPreset("tomorrow", "Tomorrow 9:00", timezone.make_aware(datetime.combine(today + timedelta(days=1), MORNING))))
-    return options
-
-
-def resolve(key: str) -> datetime | None:
-    return next((preset.at for preset in presets() if preset.key == key), None)
+def exact(moment: datetime) -> str:
+    """For the thread: 23 Oct 7am."""
+    local = timezone.localtime(moment)
+    return f"{local.day} {local:%b} {clock(moment)}"

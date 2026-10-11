@@ -1,5 +1,4 @@
 from django.http import HttpResponse
-from django.utils import timezone
 from django.views import View
 
 from accounts.mixins import SignedInRequiredMixin
@@ -8,7 +7,6 @@ from accounts.services import PreferenceService
 from board.services import SettingsService
 from calendars.mixins import CalendarConnectionPermissionRequiredMixin
 from calendars.services import NOTICE_KEY, CalendarService
-from todos.services import TodoService
 from utils.view_helper import refresh_board, render_fragment
 
 TEMPLATE = "board.settings"
@@ -25,8 +23,8 @@ class SettingsView(SignedInRequiredMixin, SettingsResponseMixin, View):
 
 
 class SettingsTimezoneView(SignedInRequiredMixin, SettingsResponseMixin, View):
-    """Save the zone, and re-file meetings under the days they fall on in it. The browser also sends
-    its own zone once, on a first visit; that never overrides one the user chose."""
+    """Save the zone the list's times read in. The browser also sends its own zone once, on a first
+    visit; that never overrides one the user chose."""
 
     def post(self, request):
         data = TimezoneSchema.from_post(request)
@@ -36,8 +34,6 @@ class SettingsTimezoneView(SignedInRequiredMixin, SettingsResponseMixin, View):
         elif not data.is_valid():
             return self.render_settings()
         PreferenceService.set_timezone(request.user, data.timezone)
-        with timezone.override(request.user.tzinfo):
-            TodoService.redate_meetings(request.user)
         response = HttpResponse() if data.detected else self.render_settings()
         return refresh_board(response)
 

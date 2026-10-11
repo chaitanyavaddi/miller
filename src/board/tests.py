@@ -1,5 +1,5 @@
 import tempfile
-from datetime import datetime, time, timedelta
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -34,6 +34,19 @@ class BoardTests(TestCase):
         self.assertContains(page, "#1 today")
         self.assertContains(page, "todo-row--current")
 
+    def test_the_thread_spells_out_its_age_from_yesterday_on(self):
+        page = self.client.get(self.url("index"))
+        self.assertContains(page, "#1 today</b></span>")                # added today: nothing more to say
+        Todo.objects.filter(pk=self.todos[0].pk).update(created_at=timezone.now() - timedelta(days=1))
+        self.assertContains(self.client.get(self.url("index")), "#1 today</b> · added yesterday")
+        Todo.objects.filter(pk=self.todos[0].pk).update(created_at=timezone.now() - timedelta(days=3))
+        self.assertContains(self.client.get(self.url("index")), "#1 today</b> · added 3 days ago")
+
+    def test_updates_not_comments(self):
+        page = self.client.get(self.url("index"))
+        self.assertContains(page, 'placeholder="Add an update"')
+        self.assertContains(page, "No updates yet.")
+
     def test_t_selects_a_todo(self):
         self.assertContains(self.client.get(self.at(self.todos[1])), "#2 today")
 
@@ -61,14 +74,29 @@ class BoardTests(TestCase):
         response = self.client.post(self.url("todo-close", self.todos[0]), {"t": self.todos[1].id})
         self.assertEqual(response["HX-Push-Url"], self.at(self.todos[1]))
 
-    def test_closing_the_todo_being_read_moves_the_thread_on(self):
+    def test_a_todo_done_today_stays_in_its_place_with_a_tick(self):
         response = self.client.post(self.url("todo-close", self.todos[0]), {"t": self.todos[0].id})
-        self.assertEqual(response["HX-Push-Url"], self.at(self.todos[1]))
-
-    def test_closing_needs_no_notice_the_done_rows_show_it(self):
-        response = self.client.post(self.url("todo-close", self.todos[0]))
         self.assertNotContains(response, 'class="toast__item"')
-        self.assertContains(response, "todo-row--done")
+        self.assertEqual(response["HX-Push-Url"], self.at(self.todos[0]))        # still the one being read
+        html = response.content.decode()
+        self.assertIn("todo-row--closed", html)
+        self.assertLess(html.index("todo 1"), html.index("todo 2"))               # nothing moved
+        self.assertIn('class="todo-row__done" aria-label="todo 1: done — reopen"', html)   # its tick, in its number's place
+        self.assertIn('<span class="todo-row__pos">02</span>', html)        # closing one changes no one's number
+        self.assertIn('<span class="todo-row__pos"></span>', html)          # the done one shows its tick instead
+        self.assertIn('aria-label="Mark todo 2 done"', html)
+        thread = self.client.get(self.url("todo-detail", self.todos[0])).content.decode()
+        self.assertIn("Done today</b>", thread)                                        # done, not a number or its age
+        self.assertIn('thread__done--on', thread)
+        self.client.post(self.url("todo-reopen", self.todos[0]), {"index": 99})
+        self.assertEqual(list(TodoService.open_for(self.user).values_list("title", flat=True)), ["todo 1", "todo 2", "todo 3"])
+
+    def test_done_yesterday_leaves_the_list_for_the_done_rows(self):
+        TodoService.close(self.todos[0])
+        Todo.objects.filter(pk=self.todos[0].pk).update(closed_at=timezone.now() - timedelta(days=1))
+        html = self.client.get(self.url("index")).content.decode()
+        self.assertNotIn("todo-row--closed", html)
+        self.assertIn("todo-row--done", html)
 
     def test_deleting_shows_a_quiet_undo_notice_and_undo_clears_it(self):
         response = self.client.post(self.url("todo-delete", self.todos[0]))
@@ -79,8 +107,9 @@ class BoardTests(TestCase):
 
     def test_the_done_stack_shows_the_last_ten_closed_newest_first(self):
         extra = [TodoService.create(self.user, TodoTitleSchema(title=f"extra {i}")) for i in range(10)]
-        for todo in self.todos + extra:
+        for n, todo in enumerate(self.todos + extra):
             TodoService.close(todo)
+            Todo.objects.filter(pk=todo.pk).update(closed_at=timezone.now() - timedelta(days=1, minutes=60 - n))  # done yesterday
         TodoService.delete(TodoService.create(self.user, TodoTitleSchema(title="binned")))
         page = self.client.get(self.url("index")).content.decode()
         self.assertEqual(page.count("todo-row--done"), 10)
@@ -90,11 +119,14 @@ class BoardTests(TestCase):
 
     def test_search_shows_only_active_matches_and_clearing_brings_done_back(self):
         TodoService.close(self.todos[0])
+        Todo.objects.filter(pk=self.todos[0].pk).update(closed_at=timezone.now() - timedelta(days=1))
         self.assertNotContains(self.client.get(self.url("todo-list"), {"q": "todo"}), "todo-row--done")
         self.assertContains(self.client.get(self.url("todo-list"), {"q": ""}), "todo-row--done", count=1)
 
     def test_reopening_from_the_done_stack_puts_it_at_the_end(self):
         TodoService.close(self.todos[0])
+        Todo.objects.filter(pk=self.todos[0].pk).update(closed_at=timezone.now() - timedelta(days=1))
+        TodoService._renumber(self.user)
         page = self.client.get(self.url("index"))
         self.assertContains(page, '"index": 3')
         html = page.content.decode()
@@ -165,7 +197,7 @@ class BoardTests(TestCase):
         response = self.client.get(self.url("review"))
         self.assertContains(response, 'You closed <span class="review__number">1</span> todo this week.')
         self.assertContains(response, "Reopen")
-        self.assertContains(response, "review-chart__bar")
+        self.assertNotContains(response, "review-chart")
 
     def test_review_filters_fall_back_to_done_this_week(self):
         response = self.client.get(self.url("review"), {"status": "bogus", "period": "bogus"})
@@ -220,6 +252,8 @@ class BoardTests(TestCase):
 
     def test_reopening_from_review_puts_it_on_top_selects_it_and_closes_the_modal(self):
         TodoService.close(self.todos[2])
+        Todo.objects.filter(pk=self.todos[2].pk).update(closed_at=timezone.now() - timedelta(days=1))
+        TodoService._renumber(self.user)
         response = self.client.post(self.url("todo-reopen", self.todos[2]), {"index": 1, "select": "1"})
         self.assertEqual(response["HX-Trigger"], "overlay-close")
         self.assertEqual(response["HX-Push-Url"], self.at(self.todos[2]))
@@ -236,62 +270,34 @@ class BoardTests(TestCase):
         self.assertNotContains(self.client.get(self.url("review"), {"period": "all", "status": "open"}), "todo 1")
 
 
-class DayBoardTests(TestCase):
+
+
+class MeetingBoardTests(TestCase):
     def setUp(self):
         self.user = IdentityService.create_user("d@x.com", name="Dee", show_meetings=True, timezone="UTC")
         self.client.force_login(self.user)
-        self.today = timezone.localdate()
-        self.todo = TodoService.create(self.user, TodoTitleSchema(title="write the plan"))
+        TodoService.create(self.user, TodoTitleSchema(title="write the plan"))
+        start = (timezone.now() + timedelta(minutes=30)).replace(second=0, microsecond=0)
+        self.meeting = Todo.objects.create(user=self.user, kind=Todo.Kind.MEETING, title="Hiring panel", starts_at=start,
+                                           ends_at=start + timedelta(hours=1), meeting_url="https://zoom.us/j/1")
 
-    def meeting(self, day, title="Hiring panel"):
-        start = timezone.make_aware(datetime.combine(day, time(10)))
-        meeting = Todo.objects.create(user=self.user, kind=Todo.Kind.MEETING, title=title, day=day, starts_at=start,
-                                      ends_at=start + timedelta(hours=1), meeting_url="https://zoom.us/j/1")
-        TodoService.slot_meeting(meeting)
-        return meeting
-
-    def test_the_list_heads_with_today_and_labels_the_coming_days(self):
-        TodoService.move_to_day(self.todo, self.today + timedelta(days=2))
+    def test_the_list_is_one_list_dated_today(self):
         page = self.client.get(reverse("board:index"))
-        self.assertContains(page, f"Todos · {self.today:%a}, {self.today:%b} {self.today.day}")
-        day = self.today + timedelta(days=2)
-        self.assertContains(page, f'<span class="day__label">{f"{day:%a}, {day:%b} {day.day}".lower()}</span>')
-
-    def test_todos_past_the_week_fold_into_later_with_a_count(self):
-        TodoService.move_to_day(self.todo, self.today + timedelta(days=30))
-        page = self.client.get(reverse("board:index"))
-        self.assertContains(page, "<span data-later-count>1 todo</span>")
-        self.assertContains(page, 'data-action="later-toggle"')
+        today = timezone.localdate()
+        self.assertContains(page, f'Todos · {today:%a}, {today:%b} {today.day}</span>')   # today, beside the header
+        self.assertNotContains(page, 'remind')
 
     def test_a_meeting_shows_its_time_and_a_read_only_thread(self):
-        meeting = self.meeting(self.today)
-        page = self.client.get(f"{reverse('board:index')}?t={meeting.id}")
-        self.assertContains(page, "10:00a")
-        self.assertContains(page, "Meeting</b> · today · 10:00a – 11:00a")
+        page = self.client.get(f"{reverse('board:index')}?t={self.meeting.id}")
+        self.assertContains(page, "Meeting</b> · ")
         self.assertContains(page, 'href="https://zoom.us/j/1"')
-        self.assertNotContains(page, 'aria-label="Todo title"')   # no rename
+        self.assertNotContains(page, 'aria-label="Todo title"')
         self.assertNotContains(page, 'aria-label="Delete todo"')
-        self.assertContains(page, 'id="comment-input"')            # notes still welcome
+        self.assertContains(page, 'id="comment-input"')
 
     def test_a_meeting_cannot_be_closed_or_renamed(self):
-        meeting = self.meeting(self.today)
-        self.assertEqual(self.client.post(reverse("board:todo-close", args=[meeting.id])).status_code, 403)
-        self.assertEqual(self.client.post(reverse("board:todo-rename", args=[meeting.id]), {"title": "x"}).status_code, 403)
-
-    def test_setting_a_reminder_shows_it_on_the_row_and_files_it_under_its_day(self):
-        tomorrow = self.today + timedelta(days=1)
-        response = self.client.post(reverse("board:todo-remind", args=[self.todo.id]), {"remind_at": f"{tomorrow.isoformat()}T09:30", "t": self.todo.id})
-        self.assertContains(response, "9:30a")
-        self.todo.refresh_from_db()
-        self.assertEqual(self.todo.day, tomorrow)
-        response = self.client.post(reverse("board:todo-remind", args=[self.todo.id]), {"remind_at": ""})
-        self.todo.refresh_from_db()
-        self.assertIsNone(self.todo.remind_at)
-
-    def test_a_garbled_reminder_is_refused_with_a_message(self):
-        response = self.client.post(reverse("board:todo-remind", args=[self.todo.id]), {"remind_at": "soon"})
-        self.assertContains(response, "isn&#x27;t a date and time")
-        self.assertEqual(response["HX-Retarget"], "#reminder")
+        self.assertEqual(self.client.post(reverse("board:todo-close", args=[self.meeting.id])).status_code, 403)
+        self.assertEqual(self.client.post(reverse("board:todo-rename", args=[self.meeting.id]), {"title": "x"}).status_code, 403)
 
 
 @override_settings(RECALL_API_KEY="key", GOOGLE_CLIENT_ID="id", GOOGLE_CLIENT_SECRET="secret")
@@ -341,58 +347,17 @@ class SettingsTests(TestCase):
         self.assertFalse(CalendarConnection.objects.exists())
 
 
-class ReminderAndReorderTests(TestCase):
-    def setUp(self):
-        self.user = IdentityService.create_user("r@x.com", timezone="UTC")
-        self.client.force_login(self.user)
-        self.todo = TodoService.create(self.user, TodoTitleSchema(title="call the bank"))
-
-    def test_the_composer_offers_the_presets_with_pick_a_time_last(self):
-        page = self.client.get(reverse("board:index")).content.decode()
-        self.assertIn('data-remind-preset="hour"', page)
-        self.assertIn('data-remind-preset="tomorrow"', page)
-        self.assertLess(page.index('data-remind-preset="tomorrow"'), page.index("Pick a time…"))
-
-    def test_adding_a_todo_with_a_preset_sets_its_reminder(self):
-        self.client.post(reverse("board:todo-create"), {"title": "pay rent", "remind_preset": "tomorrow"})
-        todo = Todo.objects.get(title="pay rent")
-        tomorrow = timezone.localdate() + timedelta(days=1)
-        self.assertEqual((todo.day, timezone.localtime(todo.remind_at).time()), (tomorrow, time(9)))
-
-    def test_a_reminder_in_the_past_is_refused_and_the_todo_is_not_added(self):
-        response = self.client.post(reverse("board:todo-create"), {"title": "too late", "remind_at": "2020-01-01T09:00"})
-        self.assertContains(response, "Pick a time that hasn")
-        self.assertFalse(Todo.objects.filter(title="too late").exists())
-
-    def test_the_thread_shows_a_reminder_line_only_once_there_is_one(self):
-        page = self.client.get(reverse("board:index"))
-        self.assertNotContains(page, 'type="datetime-local" class="reminder')
-        self.assertNotContains(page, "reminder__when")
-        self.assertContains(page, 'data-remind-for="remind-form"')       # the bell by the title
-        self.client.post(reverse("board:todo-remind", args=[self.todo.id]), {"remind_preset": "tomorrow"})
-        page = self.client.get(reverse("board:index"))
-        self.assertContains(page, "Tomorrow · 9:00a")
-        self.assertNotContains(page, 'data-remind-for="remind-form"')
-
-    def test_the_next_five_days_and_later_are_there_to_drop_onto(self):
-        page = self.client.get(reverse("board:index")).content.decode()
-        for offset in range(1, 6):
-            self.assertIn(f'data-day="{(timezone.localdate() + timedelta(days=offset)).isoformat()}"', page)
-        self.assertIn('data-day="later"', page)
-        self.assertIn('data-action="reorder-start"', page)
-
-
 class RowAgeTests(TestCase):
     def setUp(self):
         self.user = IdentityService.create_user("age@x.com")
         self.client.force_login(self.user)
 
-    def test_a_row_shows_its_age_only_from_two_days_on(self):
+    def test_a_row_shows_its_age_from_one_day_on(self):
         fresh = TodoService.create(self.user, TodoTitleSchema(title="fresh"))
         old = TodoService.create(self.user, TodoTitleSchema(title="old"))
         Todo.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(days=3))
         Todo.objects.filter(pk=fresh.pk).update(created_at=timezone.now() - timedelta(days=1))
         page = self.client.get(reverse("board:index")).content.decode()
         self.assertIn('title="3 days on list">3d</span>', page)
-        self.assertNotIn(">1d</span>", page)
+        self.assertIn('title="1 day on list">1d</span>', page)
         self.assertNotIn(">0d</span>", page)

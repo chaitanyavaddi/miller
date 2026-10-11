@@ -2,6 +2,7 @@
 <header class="topbar">
   <c-ui.logo class="topbar__brand" />
   <div class="topbar__actions">
+    <c-ui.icon-button label="Scheduled" title="Scheduled" data-action="menu-close" hx-get="{% url 'scheduled:index' %}" hx-target="#overlay" hx-swap="innerHTML"><c-ui.icon name="repeat" /></c-ui.icon-button>
     <c-ui.icon-button label="Review your todos" title="Review" data-action="menu-close" hx-get="{% url 'board:review' %}" hx-target="#overlay" hx-swap="innerHTML"><c-ui.icon name="review" /></c-ui.icon-button>
     <button type="button" class="topbar__account" aria-label="Account and shortcuts" aria-haspopup="true" aria-controls="account-menu" data-action="menu-toggle"><span class="avatar">{{ user.initial }}</span></button>
     <div class="account-menu" id="account-menu">

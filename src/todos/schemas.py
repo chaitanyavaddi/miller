@@ -1,14 +1,9 @@
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass
 
 from django.contrib import messages
 from django.db import models
-from django.utils import timezone
-
-from todos import reminders
 
 TITLE_MAX_LENGTH = 300
-LATER = "later"  # the day token for the bucket past the dated ones
 
 
 @dataclass
@@ -37,17 +32,12 @@ class TodoTitleSchema:
 
 @dataclass
 class TodoReorderSchema:
-    """The list as it now stands: todo ids in order, each with the day it sits under
-    (an ISO date, or `later`). Without days, every todo keeps its own."""
     ids: list[int]
-    days: list[str] = field(default_factory=list)
 
     @classmethod
     def from_post(cls, request) -> "TodoReorderSchema":
-        raw_ids  = request.POST.get("ids", "").split(",")
-        raw_days = request.POST.get("days", "").split(",")
-        pairs = [(int(i), (raw_days[n] if n < len(raw_days) else "").strip()) for n, i in enumerate(raw_ids) if i.strip().isdigit()]
-        obj = cls(ids=[i for i, _ in pairs], days=[d for _, d in pairs])
+        raw = request.POST.get("ids", "").split(",")
+        obj = cls(ids=[int(i) for i in raw if i.strip().isdigit()])
         obj._request = request
         return obj
 
@@ -59,42 +49,6 @@ class TodoReorderSchema:
 
     def is_valid(self) -> bool:
         return all([self.is_valid_ids()])
-
-
-@dataclass
-class TodoReminderSchema:
-    """A reminder: one of the presets (`remind_preset`), or a time picked in a datetime-local field
-    (`remind_at`), read in the user's zone. Neither means no reminder (or clearing one)."""
-    raw: str
-    remind_at: datetime | None
-    preset: str = ""
-
-    @classmethod
-    def from_post(cls, request) -> "TodoReminderSchema":
-        preset = request.POST.get("remind_preset", "").strip()
-        raw = request.POST.get("remind_at", "").strip()
-        if preset:
-            remind_at = reminders.resolve(preset)
-        else:
-            try:
-                remind_at = timezone.make_aware(datetime.fromisoformat(raw)) if raw else None
-            except ValueError:
-                remind_at = None
-        obj = cls(raw=raw, remind_at=remind_at, preset=preset)
-        obj._request = request
-        return obj
-
-    def is_valid_remind_at(self) -> bool:
-        if (self.raw or self.preset) and self.remind_at is None:
-            messages.error(self._request, "That isn't a date and time")
-            return False
-        if self.remind_at is not None and self.remind_at < timezone.now() - timedelta(minutes=1):
-            messages.error(self._request, "Pick a time that hasn't passed")
-            return False
-        return True
-
-    def is_valid(self) -> bool:
-        return all([self.is_valid_remind_at()])
 
 
 @dataclass

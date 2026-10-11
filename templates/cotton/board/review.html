@@ -1,4 +1,4 @@
-<c-vars filters statuses periods insights chart rows />
+<c-vars filters statuses periods insights rows />
 <div class="overlay">
   <button type="button" class="overlay__scrim" aria-label="Close review" data-action="overlay-close"></button>
   <div class="review" role="dialog" aria-modal="true" aria-label="Review">
@@ -32,8 +32,6 @@
         {% if insights.longest_wait.days %}Longest wait you cleared: “{{ insights.longest_wait.title }}”, {{ insights.longest_wait.days }} day{{ insights.longest_wait.days|pluralize }}.{% endif %}
       </p>
     </div>
-
-    <c-board.review-chart :chart="chart" />
 
     <div class="review__body" id="review-body">
       <c-board.review-table :rows="rows" :filters="filters" />

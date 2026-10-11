@@ -1,28 +1,24 @@
-<c-vars rows days current done reopen_index today_label="" presets="" />
+<c-vars rows current done reopen_index today_label="" />
 <section class="board__pane todo-list" id="list" aria-label="Todos">
   <div class="pane-bar">
     <span class="eyebrow todo-list__label">Todos{% if today_label %} · {{ today_label }}{% endif %}</span>
     <span class="todo-list__search">
       <c-ui.icon name="search" size="12" sw="1.8" />
-      <input type="search" id="q" class="todo-list__search-input" name="q" autocomplete="off" aria-label="Search todos and comments" placeholder="Search todos and comments" aria-keyshortcuts="/"
+      <input type="search" id="q" class="todo-list__search-input" name="q" autocomplete="off" aria-label="Search todos and updates" placeholder="Search todos and updates" aria-keyshortcuts="/"
              hx-get="{% url 'board:todo-list' %}" hx-trigger="input delay:150ms, search" hx-sync="this:replace" hx-target="#rows" hx-swap="innerHTML" hx-include="this, #board-state">
     </span>
-    <c-ui.icon-button label="Reorder todos" title="Reorder" class="icon-btn--small icon-btn--quiet todo-list__reorder-start" data-action="reorder-start"><c-ui.icon name="pencil" size="12" sw="1.7" /></c-ui.icon-button>
-    <span class="todo-list__reorder-hint">Drag todos between days · Esc cancels</span>
-    <c-ui.icon-button label="Save the order" title="Save the order" class="icon-btn--small todo-list__reorder-done" data-action="reorder-save"><c-ui.icon name="check" size="14" sw="1.8" /></c-ui.icon-button>
-    <c-ui.icon-button label="Search todos and comments" title="Search" class="icon-btn--small icon-btn--quiet todo-list__search-toggle" data-action="search-open"><c-ui.icon name="search" size="12" sw="1.8" /></c-ui.icon-button>
+    <c-ui.icon-button label="Search todos and updates" title="Search" class="icon-btn--small icon-btn--quiet todo-list__search-toggle" data-action="search-open"><c-ui.icon name="search" size="12" sw="1.8" /></c-ui.icon-button>
     <c-ui.icon-button label="Close search" title="Close search" class="icon-btn--small todo-list__search-toggle todo-list__search-close" data-action="search-close"><c-ui.icon name="x" size="13" /></c-ui.icon-button>
   </div>
 
   <div class="todo-list__rows" id="rows">
-    <c-todos.rows :rows="rows" :days="days" :current="current.id" :done="done" :reopen_index="reopen_index" :presets="presets" />
+    <c-todos.rows :rows="rows" :current="current.id" :done="done" :reopen_index="reopen_index" />
   </div>
 
-  <c-todos.form :presets="presets" />
+  <c-todos.form />
 
   <form id="reorder-form" hidden hx-post="{% url 'board:todo-reorder' %}" hx-include="#board-state" hx-target="#thread" hx-swap="outerHTML" hx-trigger="reorder" hx-sync="this:queue last">
     {% csrf_token %}
     <input type="hidden" name="ids">
-    <input type="hidden" name="days">
   </form>
 </section>

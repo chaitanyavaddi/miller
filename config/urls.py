@@ -8,4 +8,5 @@ urlpatterns = [
     path("", include("accounts.urls")),
     path("", include("comments.urls")),
     path("", include("calendars.urls")),
+    path("", include("scheduled.urls")),
 ]

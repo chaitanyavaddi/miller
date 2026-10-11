@@ -1,7 +1,7 @@
 <c-vars row reopen_index />
 <div class="todo-row todo-row--done">
   <div class="todo-row__main">
-    <span class="todo-row__pos"><c-ui.icon name="check" size="11" sw="1.8" /></span>
+    <span class="todo-row__pos" aria-hidden="true"></span>
     <span class="todo-row__title" title="{{ row.title }}">{{ row.title }}</span>
     <span class="todo-row__age" title="Closed">{{ row.closed_on }}</span>
   </div>

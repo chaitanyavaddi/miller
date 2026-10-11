@@ -1,0 +1,79 @@
+/* Scheduled: a screen like Settings and Review — the page steps back, no box around it, a title and
+   ✕ at the top. Each item is a plain row: a title you can rename in place, then its rhythm and what
+   that needs (a date, the days, the day of the month). Ink on paper: the chosen thing is dark and underlined. */
+
+/* — the screen — */
+.scheduled { position: relative; width: 100%; max-width: 640px; max-height: calc(100vh - 96px); display: flex; flex-direction: column; gap: 24px;
+  padding: 8px 0; background: var(--bg); }
+.scheduled__bar { display: flex; align-items: center; justify-content: space-between; }
+.scheduled__rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; margin: 0 -4px; padding: 0 4px; display: flex; flex-direction: column; gap: 4px;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.scheduled__rows .todo-row { min-height: 40px; }
+.scheduled__empty { padding: 8px 0; font-size: 13px; color: var(--text-4); }
+.scheduled__foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 14px; border-top: 1px dotted var(--border); }
+.scheduled__summary { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }  /* what Save would do: 2 updated · 1 added */
+.scheduled__add { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0; background: none; border: none; cursor: pointer;
+  font: inherit; font-size: 13.5px; color: var(--text-4); align-self: flex-start; }
+.scheduled__add:hover, .scheduled__add:hover .composer__plus { color: var(--text); }
+.scheduled__save { height: 26px; padding: 0; background: none; border: none; cursor: pointer; font-family: var(--font-mono); font-size: 11px; color: var(--text);
+  text-transform: uppercase; letter-spacing: 0.06em; text-decoration: underline dotted; text-underline-offset: 4px; }
+.scheduled__save:hover { text-decoration-style: solid; }
+.scheduled .form-messages { margin: 0; }
+.scheduled__error { margin-top: -12px; }
+.scheduled__error[hidden] { display: none; }
+
+/* — a row: the title, then the rhythm and what it needs, each a quiet word that opens a little menu — */
+/* Two columns after the title, the same on every row: the rhythm word, then its detail. */
+.scheduled-row { gap: 12px; }
+.scheduled-row .todo-row__action { justify-content: center; }  /* the trash sits a little in, under the ✕ */
+.scheduled-row__title { flex: 1 1 auto; min-width: 0; }
+.scheduled-row__input { width: 100%; height: 36px; padding: 0; border: none; outline: none; background: transparent; font: inherit; font-size: 13.5px; color: var(--text-2);
+  letter-spacing: -0.01em; text-overflow: ellipsis; }
+.scheduled-row__input:hover, .scheduled-row__input:focus { color: var(--text); }
+.scheduled-row__input:focus-visible { outline: none; }  /* just type: no box around the title */
+.scheduled-row__when { flex: none; display: grid; grid-template-columns: 84px 160px; align-items: center; column-gap: 16px; }
+.scheduled-row__detail { display: flex; align-items: center; min-width: 0; }
+.scheduled-chip { display: inline-flex; align-items: center; gap: 3px; height: 28px; padding: 0; background: none; border: none; cursor: pointer;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+.scheduled-chip:hover, .scheduled-chip[aria-expanded="true"] { color: var(--text); }
+.scheduled-chip__caret { font-size: 8px; color: var(--text-4); }
+.scheduled-chip--empty { color: var(--text-4); }  /* not chosen yet */
+.scheduled-row__input::placeholder { color: var(--text-4); }
+.scheduled-row [data-detail][hidden] { display: none; }  /* only the chosen rhythm's detail shows */
+/* Pending, until Save: a dot by a changed row, a fading for one to be removed, a red dot where Save found a gap. */
+.scheduled-row::before { content: ""; position: absolute; left: -12px; top: 50%; width: 4px; height: 4px; margin-top: -2px; border-radius: 50%; background: transparent; }
+.scheduled-row.is-changed::before, .scheduled-row[data-id=""]::before { background: var(--text-4); }
+.scheduled-row.has-problem::before { background: var(--st-blocked); }
+.scheduled-row.is-removed .scheduled-row__title, .scheduled-row.is-removed .scheduled-row__when { opacity: 0.35; text-decoration: line-through; text-decoration-color: var(--border); }
+.scheduled-days { display: inline-grid; grid-template-columns: repeat(7, 1fr); width: 100%; }
+.scheduled-days__day { height: 28px; padding: 0; text-align: left; background: none; border: none; cursor: pointer; font-family: var(--font-mono); font-size: 11px; color: var(--text-4);
+  text-underline-offset: 4px; }
+.scheduled-days__day:hover:not(:disabled) { color: var(--text); }
+.scheduled-days__day.is-on { color: var(--text); font-weight: 600; text-decoration: underline solid 1px; }
+.scheduled-days__day:disabled { cursor: default; }
+
+/* — popovers: the rhythm menu, a month to pick a date from, the days of a month — */
+.popover { position: fixed; z-index: 25; padding: 8px 0; background: var(--bg); box-shadow: 0 0 0 1px rgba(38, 37, 30, 0.07), 0 10px 28px rgba(38, 37, 30, 0.10);
+  display: flex; flex-direction: column; animation: popover-in 0.12s ease-out; }
+.popover[hidden] { display: none; }
+@keyframes popover-in { from { opacity: 0; transform: translateY(-3px); } }
+.popover__item { height: 30px; padding: 0 16px; background: none; border: none; cursor: pointer; text-align: left; font-size: 13px; color: var(--text-3); white-space: nowrap; }
+.popover__item:hover, .popover__item:focus-visible { color: var(--text); outline: none; }
+.popover__item.is-on { color: var(--text); font-weight: 600; }
+.popover--calendar { padding: 12px 14px; }
+.popover__grid { display: grid; grid-template-columns: repeat(7, 30px); }
+.popover__head { height: 20px; font-family: var(--font-mono); font-size: 10px; color: var(--text-4); }
+.popover__day { position: relative; height: 30px; padding: 0; background: none; border: none; cursor: pointer; text-align: left; font-size: 12.5px; color: var(--text-3);
+  text-underline-offset: 4px; }
+.popover__day:hover:not(:disabled) { color: var(--text); }
+.popover__day:disabled { color: var(--text-4); opacity: 0.45; cursor: default; }
+.popover__day.is-today { text-decoration: underline dotted; }
+.popover__day.is-on { color: var(--text); font-weight: 600; text-decoration: underline solid 1px; }
+.popover__month[hidden] { display: none; }
+.popover__month-head { display: flex; align-items: center; justify-content: space-between; height: 24px; margin-bottom: 6px; }
+.popover__title { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+.popover__nav { width: 22px; height: 22px; padding: 0; background: none; border: none; cursor: pointer; color: var(--text-4); font-size: 15px; line-height: 1; }
+.popover__nav:hover { color: var(--text); }
+.popover__nav:disabled { visibility: hidden; }
+.popover__note { padding-top: 6px; font-size: 11.5px; color: var(--text-4); }
+@media (prefers-reduced-motion: reduce) { .popover { animation: none; } }

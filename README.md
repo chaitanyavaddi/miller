@@ -29,11 +29,13 @@ Conventions follow `.claude/patterns.md`. Apps live in `src/`, one per domain:
 Each domain app has `models.py`, `schemas.py` (dataclass input + `is_valid()`, errors via messages), `services` (static methods), `rules.py` and `mixins.py`.
 Templates: `templates/<app>/` pages and `templates/cotton/<domain>/` components. CSS: `static/css/main.css` plus one file per domain. JS: `static/js/main.js` plus one per domain.
 
-## Days, reminders, meetings
+## Scheduled, meetings
 
-The list is filed by day: today under the heading, then the next three days (always shown, empty or not), then a folded "later". Unfinished todos roll to the top of today at midnight. A todo can carry a reminder (it files the todo under that day; sending it is not wired up yet). Days are counted in the user's time zone: the browser's is saved on a first visit, and it can be changed in Settings (avatar menu).
+Today's list is only for doing: one ordered list of today's todos. Things that repeat, or can't start until a date, live in **Scheduled** (the repeat icon in the top bar): each item is a title, a rhythm (once, every day, weekdays, weekly, monthly, yearly) and an optional time. An item never shows in today's list itself; on each day it falls on, it produces a normal todo at the top of the list, with a "From Scheduled · …" line in its thread. `scheduled/` holds the items, the rhythm rules (`rhythm.py`) and the producer, which runs whenever the board is read (so a new day, a reload or a return after missed days catches up, one todo per item). It never makes a second copy while the last one is still open, and a "once" item goes after it produces.
 
-Meetings come from calendars synced by [Recall.ai](https://docs.recall.ai/docs/calendar-v2-integration-guide) and are listed as read-only todos (`kind=meeting`): a thread and comments, no rename/close/delete, and they move only within their own day. Signed-in users connect one or more Google or Outlook calendars in Settings; their own Google address is suggested first.
+A produced todo with a time notifies at that time while Miller is open in a tab (a notice, plus a browser notification if allowed). Web push to a closed tab is not built yet: it needs VAPID keys, a service worker and a push sender.
+
+Meetings come from calendars synced by [Recall.ai](https://docs.recall.ai/docs/calendar-v2-integration-guide) and are listed as read-only todos (`kind=meeting`) after the user's own, for today only and until they end: a thread and comments, no rename/close/delete. Signed-in users connect one or more Google or Outlook calendars in Settings; their own Google address is suggested first.
 
 - `calendars/` connections, the OAuth consent flow, the Recall client and webhook, `sync_calendars` command.
 - Env: `RECALL_API_KEY`, `RECALL_API_BASE` (your Recall region, default `https://us-east-1.recall.ai`), `RECALL_WEBHOOK_SECRET`; Google reuses `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`; Outlook needs `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET`.

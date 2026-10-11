@@ -1,7 +1,9 @@
-<c-vars rows days="" current="" searching="" done="" reopen_index="" presets="" />
-{% if searching %}
-  {% for row in rows %}<c-todos.row :row="row" :current="current" />{% empty %}<p class="todo-list__empty todo-list__empty--nomatch">No matches.</p>{% endfor %}
-{% else %}
-  {% for day in days %}<c-todos.day :day="day" :current="current" :presets="presets" />{% endfor %}
+<c-vars rows current="" searching="" done="" reopen_index="" />
+{% for row in rows %}
+  <c-todos.row :row="row" :current="current" />
+{% empty %}
+  {% if searching %}<p class="todo-list__empty todo-list__empty--nomatch">No matches.</p>{% endif %}
+{% endfor %}
+{% if not searching %}
   {% for row in done %}<c-todos.done-row :row="row" :reopen_index="reopen_index" />{% endfor %}
 {% endif %}

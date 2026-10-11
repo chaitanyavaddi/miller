@@ -1,0 +1,40 @@
+<c-vars rows rhythms months weekdays month_days />
+<div class="overlay">
+  <div class="overlay__scrim" aria-hidden="true"></div>  {# closes only by ✕ (discard) or Save #}
+  <div class="scheduled" role="dialog" aria-modal="true" aria-labelledby="scheduled-title" data-scheduled>
+    <div class="scheduled__bar">
+      <span class="eyebrow" id="scheduled-title">Scheduled todos</span>
+      <c-ui.icon-button label="Close without saving" title="Close without saving" class="icon-btn--small" data-action="overlay-close"><c-ui.icon name="x" size="14" /></c-ui.icon-button>
+    </div>
+    <c-ui.messages />
+
+    <div class="scheduled__rows" data-rows>
+      {% for row in rows %}<c-scheduled.row :row="row" :weekdays="weekdays" />{% endfor %}
+    </div>
+    <p class="scheduled__empty" data-empty{% if rows %} hidden{% endif %}>Nothing scheduled yet.</p>
+
+    <button type="button" class="scheduled__add" data-add><span class="composer__plus" aria-hidden="true">+</span>Add a scheduled todo</button>
+    <template data-row-template><c-scheduled.row :weekdays="weekdays" /></template>
+
+    {# The pickers, shared by every row: they open beside whichever row asked. #}
+    <div class="popover" data-panel="rhythm" role="menu" hidden>
+      {% for choice in rhythms %}<button type="button" role="menuitem" class="popover__item" data-pick-rhythm="{{ choice.value }}">{{ choice.label }}</button>{% endfor %}
+    </div>
+    <div class="popover popover--calendar" data-panel="date" role="dialog" aria-label="Date" hidden>
+      <c-scheduled.calendar :months="months" draft="1" />
+    </div>
+    <div class="popover popover--calendar" data-panel="monthday" role="dialog" aria-label="Day of the month" hidden>
+      <div class="popover__grid">
+        {% for day in month_days %}<button type="button" class="popover__day" data-pick-month-day="{{ day.value }}">{{ day.label }}</button>{% endfor %}
+      </div>
+      <p class="popover__note">In a shorter month, its last day.</p>
+    </div>
+
+    <p class="form-message form-message--error scheduled__error" data-error role="alert" hidden></p>
+    <form class="scheduled__foot" data-save-form hx-post="{% url 'scheduled:save' %}" hx-swap="none">
+      {% csrf_token %}
+      <span class="scheduled__summary" data-summary></span>
+      <button type="submit" class="scheduled__save">Save</button>
+    </form>
+  </div>
+</div>

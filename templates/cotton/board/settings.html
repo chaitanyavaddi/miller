@@ -11,7 +11,7 @@
 
     <section class="settings__section" aria-labelledby="settings-zone">
       <h2 class="settings__heading" id="settings-zone">Time zone</h2>
-      <p class="settings__hint">Your days begin and end here, and meetings and reminders show in it.</p>
+      <p class="settings__hint">Your days begin and end here, and scheduled todos and meetings follow it.</p>
       <form hx-post="{% url 'board:settings-timezone' %}" hx-trigger="change" hx-target="#overlay" hx-swap="innerHTML">
         {% csrf_token %}
         <select class="settings__select" name="timezone" aria-label="Time zone">

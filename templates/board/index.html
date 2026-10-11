@@ -4,18 +4,21 @@
 <link rel="stylesheet" href="{% static 'css/board.css' %}">
 <link rel="stylesheet" href="{% static 'css/todos.css' %}">
 <link rel="stylesheet" href="{% static 'css/comments.css' %}">
+<link rel="stylesheet" href="{% static 'css/scheduled.css' %}">
 {% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'js/todos.js' %}" defer></script>
 <script src="{% static 'js/comments.js' %}" defer></script>
+<script src="{% static 'js/scheduled.js' %}" defer></script>
 {% endblock %}
 
 {% block content %}
 <c-layout.topbar :user="request.user" />
 <div class="page">
-  <c-board.workspace :rows="rows" :days="days" :today_label="today_label" :presets="presets" :current="current" :comments="comments" :undo="undo" :done="done" :reopen_index="reopen_index" />
+  <c-board.workspace :rows="rows" :current="current" :today_label="today_label" :comments="comments" :undo="undo" :done="done" :reopen_index="reopen_index" />
 </div>
 <div id="overlay"{% if request.GET.settings %} hx-get="{% url 'board:settings' %}" hx-trigger="load" hx-swap="innerHTML"{% endif %}></div>
+<div class="notice" id="notice" role="status" aria-live="polite"></div>
 {% if not request.user.timezone %}<span hidden id="timezone-detect" data-url="{% url 'board:settings-timezone' %}"></span>{% endif %}
 {% endblock %}

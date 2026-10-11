@@ -44,10 +44,10 @@ class MeetingSyncTests(TestCase):
     def meetings(self):
         return list(Todo.objects.filter(kind=Todo.Kind.MEETING).values_list("title", flat=True))
 
-    def test_an_event_becomes_a_meeting_on_its_day(self):
+    def test_an_event_becomes_a_meeting_at_its_time(self):
         CalendarService.apply(self.connection, event("e1", self.start))
         meeting = Todo.objects.get(kind=Todo.Kind.MEETING)
-        self.assertEqual((meeting.title, meeting.day), ("Design sync", timezone.localtime(self.start).date()))
+        self.assertEqual((meeting.title, meeting.starts_at), ("Design sync", self.start))
         self.assertEqual(meeting.meeting_url, "https://meet.google.com/abc-defg-hij")
 
     def test_a_moved_event_moves_its_meeting_and_keeps_its_thread(self):
@@ -55,7 +55,7 @@ class MeetingSyncTests(TestCase):
         meeting = Todo.objects.get(kind=Todo.Kind.MEETING)
         CalendarService.apply(self.connection, event("e1", self.start + timedelta(days=2), title="Moved sync"))
         meeting.refresh_from_db()
-        self.assertEqual((meeting.title, meeting.day), ("Moved sync", timezone.localtime(self.start + timedelta(days=2)).date()))
+        self.assertEqual((meeting.title, meeting.starts_at), ("Moved sync", self.start + timedelta(days=2)))
 
     def test_deleted_cancelled_declined_and_all_day_events_are_not_listed(self):
         CalendarService.apply(self.connection, event("e1", self.start))

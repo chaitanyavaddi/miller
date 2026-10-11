@@ -8,7 +8,6 @@ from board.views.todo_views import (
     TodoDeleteView,
     TodoDetailView,
     TodoListView,
-    TodoRemindView,
     TodoRenameView,
     TodoReopenView,
     TodoReorderView,
@@ -17,6 +16,6 @@ from board.views.todo_views import (
 __all__ = [
     "BoardView", "BoardWorkspaceView", "CommentCreateView", "ReviewDeleteView", "ReviewThreadView", "ReviewView",
     "SettingsCalendarDisconnectView", "SettingsMeetingsView", "SettingsTimezoneView", "SettingsView",
-    "TodoCloseView", "TodoCreateView", "TodoDeleteView", "TodoDetailView", "TodoListView", "TodoRemindView",
+    "TodoCloseView", "TodoCreateView", "TodoDeleteView", "TodoDetailView", "TodoListView",
     "TodoRenameView", "TodoReopenView", "TodoReorderView",
 ]
