@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
@@ -8,6 +9,8 @@ from scheduled import rhythm
 from scheduled.models import ScheduledItem
 from todos.models import Todo
 from todos.services import TodoService
+
+User = get_user_model()
 
 
 class ProductionService:
@@ -29,6 +32,16 @@ class ProductionService:
             if todo is not None:
                 produced.append(todo)
         return produced
+
+    @staticmethod
+    def produce_all() -> int:
+        """For the cron job: every user with something scheduled, each in their own zone, so a todo is
+        on the list shortly after that user's midnight. Safe to run as often as you like."""
+        made = 0
+        for user in User.objects.filter(scheduled_items__isnull=False).distinct():
+            with timezone.override(user.tzinfo):
+                made += len(ProductionService.produce_due(user))
+        return made
 
     @staticmethod
     @transaction.atomic

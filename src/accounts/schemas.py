@@ -23,8 +23,12 @@ class TimezoneSchema:
         obj._request = request
         return obj
 
+    @property
+    def is_known(self) -> bool:
+        return self.timezone in available_timezones()
+
     def is_valid_timezone(self) -> bool:
-        if self.timezone not in available_timezones():
+        if not self.is_known:
             messages.error(self._request, "Pick a time zone from the list")
             return False
         return True

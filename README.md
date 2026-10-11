@@ -42,6 +42,7 @@ Meetings come from calendars synced by [Recall.ai](https://docs.recall.ai/docs/c
 - Google console: enable the Calendar API, add the `calendar.events.readonly` scope to the consent screen, and add the redirect URI `<SITE_URL>/calendars/google/callback/`. Azure app: redirect URI `<SITE_URL>/calendars/microsoft/callback/`, delegated `Calendars.Read` + `offline_access`.
 - Recall dashboard: webhook endpoint `<SITE_URL>/calendars/webhook/` for `calendar.sync_events` and `calendar.update`; its signing secret is `RECALL_WEBHOOK_SECRET`.
 - Optional fallback for missed webhooks: run `python manage.py sync_calendars` on a schedule.
+- Scheduled todos: run `python manage.py produce_scheduled` every 15 minutes (`*/15 * * * *`). It puts what's due on each user's list just after their own midnight; safe to rerun. The board also does this on load.
 
 ## Docker
 

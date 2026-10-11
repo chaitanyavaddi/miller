@@ -28,8 +28,8 @@ class SettingsTimezoneView(SignedInRequiredMixin, SettingsResponseMixin, View):
 
     def post(self, request):
         data = TimezoneSchema.from_post(request)
-        if data.detected:
-            if request.user.timezone or not data.is_valid():
+        if data.detected:  # in the background: an unknown zone is just skipped, never a message
+            if request.user.timezone or not data.is_known:
                 return HttpResponse(status=204)
         elif not data.is_valid():
             return self.render_settings()

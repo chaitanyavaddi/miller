@@ -318,6 +318,11 @@ class SettingsTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.timezone, "Europe/Berlin")
 
+    def test_an_unknown_browser_zone_is_skipped_without_a_message(self):
+        response = self.client.post(reverse("board:settings-timezone"), {"timezone": "Etc/Unknown", "detected": "1"})
+        self.assertEqual(response.status_code, 204)
+        self.assertNotContains(self.client.get(reverse("board:index")), "Pick a time zone")
+
     def test_an_unknown_zone_is_refused(self):
         self.assertContains(self.client.post(reverse("board:settings-timezone"), {"timezone": "Mars/Base"}), "Pick a time zone from the list")
 

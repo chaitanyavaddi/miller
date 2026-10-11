@@ -71,6 +71,21 @@ class ProductionTests(TestCase):
         first = Todo.objects.filter(user=self.user, title="stretch").first()
         self.assertEqual(first.position, 1)
 
+    def test_the_cron_job_makes_each_users_todos_at_their_own_midnight(self):
+        from datetime import datetime, timezone as dt_timezone
+        kolkata, la = IdentityService.create_user("in@x.com"), IdentityService.create_user("la@x.com")
+        kolkata.timezone, la.timezone = "Asia/Kolkata", "America/Los_Angeles"
+        kolkata.save(); la.save()
+        for user in (kolkata, la):  # both scheduled for Mondays
+            item = ScheduledItem.objects.create(user=user, title="monday thing", rhythm=Rhythm.WEEKLY, weekdays="0")
+            ScheduledItem.objects.filter(pk=item.pk).update(created_at=datetime(2026, 9, 1, tzinfo=dt_timezone.utc), last_produced_on=MONDAY - timedelta(days=7))
+        sunday_evening_utc = datetime(2026, 10, 11, 20, 0, tzinfo=dt_timezone.utc)  # already Monday 01:30 in Kolkata, Sunday in LA
+        with patch("django.utils.timezone.now", return_value=sunday_evening_utc):
+            self.assertEqual(ProductionService.produce_all(), 1)
+            self.assertEqual(ProductionService.produce_all(), 0)  # run again: nothing twice
+        self.assertTrue(Todo.objects.filter(user=kolkata, title="monday thing").exists())
+        self.assertFalse(Todo.objects.filter(user=la, title="monday thing").exists())
+
     def test_an_open_copy_from_yesterday_isnt_made_twice(self):
         self.schedule(rhythm=Rhythm.WEEKLY, weekdays="0,1,2,3,4,5,6")
         self.produce_on(MONDAY)
