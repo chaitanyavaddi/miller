@@ -5,13 +5,18 @@ from calendars.models import CalendarConnection
 from calendars.services import CalendarService
 
 
+# Providers offered in Settings. Outlook works end to end but stays hidden until it's set up and verified.
+OFFERED_PROVIDERS = (CalendarConnection.Provider.GOOGLE,)
+
+
 class SettingsService:
     """Read model for the settings modal: the user's zone, and their calendars once meetings are on."""
 
     @staticmethod
     def build(user, notice: str = "") -> dict:
         providers = [
-            (value, label) for value, label in CalendarConnection.Provider.choices if CalendarService.can_connect(value)
+            (value, label) for value, label in CalendarConnection.Provider.choices
+            if value in OFFERED_PROVIDERS and CalendarService.can_connect(value)
         ]
         return {
             "user":         user,

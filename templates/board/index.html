@@ -21,5 +21,6 @@
 </div>
 <div id="overlay"{% if request.GET.settings %} hx-get="{% url 'board:settings' %}" hx-trigger="load" hx-swap="innerHTML"{% endif %}></div>
 <div class="notice" id="notice" role="status" aria-live="polite"></div>
+<span hidden id="board-stamp" data-url="{% url 'board:stamp' %}"></span>
 {% if not request.user.timezone %}<span hidden id="timezone-detect" data-url="{% url 'board:settings-timezone' %}"></span>{% endif %}
 {% endblock %}

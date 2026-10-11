@@ -27,29 +27,47 @@
 .thread__join { margin-left: auto; margin-right: 12px; }
 
 /* — settings modal: a narrow column of plain sections, like the rest of the board — */
-.settings { position: relative; max-width: 480px; width: 100%; max-height: calc(100vh - 96px); overflow-y: auto; display: flex; flex-direction: column; gap: 28px; background: var(--bg); padding: 8px 0; }
-.settings__bar { display: flex; align-items: center; justify-content: space-between; }
-.settings__notice { font-size: 13px; color: var(--text); }
-.settings__section { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
-.settings__heading { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.02em; }
-.settings__hint { font-size: 13px; color: var(--text-4); max-width: 44ch; }
-.settings__select { font: inherit; font-size: 13px; color: var(--text); background: transparent; border: none; border-bottom: 1px dotted var(--text-4); padding: 4px 0; max-width: 100%; cursor: pointer; }
-.settings__toggle { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--text); cursor: pointer; }
+/* — settings: All todos' frame (720 wide, fixed height, label + ✕ on top), then rows of a label on
+     the left and its setting on the right. One rhythm: 36px lines, 32px between rows. — */
+.settings { position: relative; max-width: 720px; width: 100%; height: min(680px, calc(100vh - 96px)); display: flex; flex-direction: column; background: var(--bg); padding: 8px 0; }
+.settings__body { margin-top: 24px; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 12px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.settings__notice { margin-bottom: 24px; font-size: 13px; color: var(--text); }
+.settings__row { display: grid; grid-template-columns: 160px minmax(0, 1fr); column-gap: 32px; }
+.settings__row + .settings__row { margin-top: 32px; }
+.settings__label { margin: 0; font-size: 13px; line-height: 36px; font-weight: 400; color: var(--text-4); }
+.settings__value { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.settings__line { font-size: 13.5px; line-height: 36px; color: var(--text); }
+.settings__hint { margin-top: 4px; font-size: 12.5px; line-height: 20px; color: var(--text-4); max-width: 52ch; }
+.settings__action { padding: 0; }
+.settings__select { appearance: none; -webkit-appearance: none; height: 36px; margin: 0; font: inherit; font-size: 13.5px; color: var(--text); background: transparent; border: none;
+  padding: 0; max-width: 100%; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 4px; }
+.settings__toggle { display: flex; align-items: center; gap: 10px; min-height: 36px; font-size: 13.5px; color: var(--text); cursor: pointer; }
 .settings__toggle input { margin: 0; accent-color: var(--text); }
-.settings__calendars { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; }
-.settings__calendar { display: flex; align-items: center; gap: 12px; height: 36px; }
-.settings__calendar-email { font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.settings__calendar-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); flex: none; }
-.settings__calendar-action { margin-left: auto; flex: none; }
-.settings__source { display: flex; align-items: center; min-height: 30px; padding-left: 14px; }
-.settings__source .settings__toggle { font-size: 13px; color: var(--text-2); }
-.settings__suggest { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; color: var(--text); text-decoration: none; border-bottom: 1px dotted var(--border); }
-.settings__suggest:hover .settings__suggest-text { text-decoration: underline dotted; text-underline-offset: 4px; }
-.settings__suggest-text { font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.settings__suggest-text b { font-weight: 500; }
-.settings__suggest-meta { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--text-4); flex: none; }
-.settings__more { display: flex; align-items: center; gap: 14px; }
-.settings__more-label { font-size: 13px; color: var(--text-4); }
+.settings__meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); flex: none; }
+.settings__value > .shortcuts { padding-top: 8px; }  /* its 20px lines, centred on the label's 36px line */
+
+/* Calendars: each account a heading line with its calendars beneath, then the ways to add one. */
+.settings__account { width: 100%; }
+.settings__account + .settings__account { margin-top: 12px; }
+.settings__account-head { display: flex; align-items: center; gap: 12px; height: 36px; }
+.settings__account-email { font-size: 13.5px; font-weight: 500; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings__account-actions { margin-left: auto; display: flex; align-items: center; gap: 16px; flex: none; }
+.settings__account-actions > .text-btn { display: inline-flex; align-items: center; height: 20px; }
+.settings__source .settings__toggle { color: var(--text-3); }
+.settings__add { width: 100%; display: flex; flex-direction: column; }
+.settings__account + .settings__add { margin-top: 12px; }
+.settings__add-link { display: flex; align-items: center; gap: 10px; height: 36px; color: var(--text-3); text-decoration: none; }
+.settings__add-link:hover { color: var(--text); }
+.settings__add-link:hover .settings__add-text { text-decoration: underline dotted; text-underline-offset: 4px; }
+.settings__plus { font-family: var(--font-mono); font-size: 13px; color: var(--text-4); width: 13px; flex: none; }
+.settings__add-text { font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings__add-text b { font-weight: 500; color: var(--text); }
+.settings__add-link .settings__meta { margin-left: auto; }
+
+@media (max-width: 760px) {
+  .settings__row { grid-template-columns: minmax(0, 1fr); }
+  .settings__label { line-height: 20px; }
+}
 
 /* — Timeline: one modal, two tabs — Past (every todo, the most recently closed first)
      and Scheduled. The same width and header for both, so switching never jumps. — */

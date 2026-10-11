@@ -24,7 +24,8 @@ class Todo(models.Model):
     produced_on = models.DateField(null=True, blank=True)       # the day a scheduled item produced it
     starts_at   = models.DateTimeField(null=True, blank=True)   # meetings only
     ends_at     = models.DateTimeField(null=True, blank=True)   # meetings only
-    meeting_url = models.URLField(max_length=1000, blank=True)  # meetings only
+    meeting_url = models.URLField(max_length=1000, blank=True)  # meetings only: where to join
+    event_url   = models.URLField(max_length=2000, blank=True)  # meetings only: the event in its calendar
     closed_at   = models.DateTimeField(null=True, blank=True)
     deleted_at  = models.DateTimeField(null=True, blank=True)
     created_at  = models.DateTimeField(auto_now_add=True)

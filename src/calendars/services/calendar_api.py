@@ -46,6 +46,7 @@ class MeetingFields:
     ends_at: datetime
     meeting_url: str
     ical_uid: str
+    event_url: str = ""  # the event in the user's calendar
 
 
 @dataclass(frozen=True)
@@ -105,7 +106,8 @@ def meeting_link(*texts: str) -> str:
     return ""
 
 
-def meeting_fields(title: str, starts_at: datetime | None, ends_at: datetime | None, meeting_url: str, ical_uid: str) -> MeetingFields | None:
+def meeting_fields(title: str, starts_at: datetime | None, ends_at: datetime | None, meeting_url: str, ical_uid: str,
+                   event_url: str = "") -> MeetingFields | None:
     if starts_at is None or ends_at is None:
         return None
     return MeetingFields(
@@ -114,6 +116,7 @@ def meeting_fields(title: str, starts_at: datetime | None, ends_at: datetime | N
         ends_at=ends_at,
         meeting_url=(meeting_url or "")[:1000],
         ical_uid=(ical_uid or "")[:1024],
+        event_url=(event_url or "")[:2000],
     )
 
 
@@ -161,6 +164,7 @@ class GoogleCalendarApi:
             parse_datetime(end.get("dateTime") or ""),
             item.get("hangoutLink") or video or meeting_link(item.get("location", ""), item.get("description", "")),
             item.get("iCalUID", ""),
+            item.get("htmlLink", ""),
         )
 
     @staticmethod
@@ -205,7 +209,7 @@ class MicrosoftCalendarApi:
         """Every occurrence in the window (calendarView expands recurring events), times in UTC."""
         query = {
             "startDateTime": start.astimezone(UTC).isoformat(), "endDateTime": end.astimezone(UTC).isoformat(), "$top": "100",
-            "$select": "id,iCalUId,subject,start,end,isAllDay,isCancelled,responseStatus,onlineMeeting,onlineMeetingUrl,location,bodyPreview",
+            "$select": "id,iCalUId,subject,start,end,isAllDay,isCancelled,responseStatus,onlineMeeting,onlineMeetingUrl,location,bodyPreview,webLink",
         }
         url = f"{GRAPH_API}/me/calendars/{urllib.parse.quote(calendar_id, safe='')}/calendarView?" + urllib.parse.urlencode(query)
         while url:
@@ -225,6 +229,7 @@ class MicrosoftCalendarApi:
             (item.get("onlineMeeting") or {}).get("joinUrl") or item.get("onlineMeetingUrl")
             or meeting_link((item.get("location") or {}).get("displayName", ""), item.get("bodyPreview", "")),
             item.get("iCalUId", ""),
+            item.get("webLink", ""),
         )
 
     @staticmethod

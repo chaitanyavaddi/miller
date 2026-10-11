@@ -257,7 +257,7 @@ class CalendarService:
     def _create(user, fields: MeetingFields) -> Todo:
         return Todo.objects.create(
             user=user, kind=Todo.Kind.MEETING, title=fields.title,
-            starts_at=fields.starts_at, ends_at=fields.ends_at, meeting_url=fields.meeting_url,
+            starts_at=fields.starts_at, ends_at=fields.ends_at, meeting_url=fields.meeting_url, event_url=fields.event_url,
         )
 
     @staticmethod
@@ -266,7 +266,8 @@ class CalendarService:
         meeting.starts_at   = fields.starts_at
         meeting.ends_at     = fields.ends_at
         meeting.meeting_url = fields.meeting_url
-        meeting.save(update_fields=["title", "starts_at", "ends_at", "meeting_url", "updated_at"])
+        meeting.event_url   = fields.event_url
+        meeting.save(update_fields=["title", "starts_at", "ends_at", "meeting_url", "event_url", "updated_at"])
 
     @staticmethod
     def _unlink(event: CalendarEvent) -> None:

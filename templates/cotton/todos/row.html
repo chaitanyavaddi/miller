@@ -21,7 +21,11 @@
   {% endif %}
   {# The tick column, right of the age: hover an open row to tick it. #}
   <span class="todo-row__actions">
-    {% if row.is_meeting or row.is_done %}
+    {% if row.is_meeting and row.event_url %}
+    <a class="todo-row__tick todo-row__out" href="{{ row.event_url }}" target="_blank" rel="noopener" aria-label="Open {{ row.title }} in your calendar" title="Open in calendar">
+      <c-ui.icon name="out" size="13" sw="1.8" />
+    </a>
+    {% elif row.is_meeting or row.is_done %}
     <span class="todo-row__tick" aria-hidden="true"></span>
     {% else %}
     <button type="button" class="todo-row__tick" aria-label="Mark {{ row.title }} done" title="Mark done"

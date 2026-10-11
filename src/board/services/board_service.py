@@ -23,6 +23,7 @@ class BoardRow:
     when: str = ""          # a meeting's start, as the row says it (10am)
     span: str = ""          # a meeting's start – end, as the thread says it
     meeting_url: str = ""
+    event_url: str = ""     # a meeting's event in its calendar: the row links out to it
     from_schedule: bool = False  # Scheduled produced it today: a clock marks the row
     schedule_label: str = ""     # its rhythm, while the scheduled item is there: "every day"
     is_done: bool = False        # done today: still in its place
@@ -83,6 +84,7 @@ class BoardService:
             when=reminders.clock(todo.starts_at) if todo.is_meeting and todo.starts_at else "",
             span=f"{reminders.exact(todo.starts_at)} – {reminders.clock(todo.ends_at)}" if todo.is_meeting and todo.ends_at else "",
             meeting_url=todo.meeting_url,
+            event_url=todo.event_url,
             is_done=todo.closed_at is not None,
             from_schedule=todo.produced_on == today,
             schedule_label=rhythm.label(todo.scheduled_item, today) if todo.scheduled_item else "",

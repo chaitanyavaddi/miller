@@ -1,6 +1,7 @@
 from django.urls import path
 
 from board.views import (
+    BoardStampView,
     BoardView,
     BoardWorkspaceView,
     HomeView,
@@ -29,6 +30,7 @@ urlpatterns = [
     path("",                          HomeView.as_view(),          name="home"),
     path("app/",                      BoardView.as_view(),         name="index"),
     path("board/",                    BoardWorkspaceView.as_view(), name="workspace"),
+    path("board/stamp/",              BoardStampView.as_view(),    name="stamp"),
     path("todos/",                    TodoListView.as_view(),      name="todo-list"),
     path("todos/new/",                TodoCreateView.as_view(),    name="todo-create"),
     path("todos/reorder/",            TodoReorderView.as_view(),   name="todo-reorder"),

@@ -50,9 +50,8 @@
 @keyframes drop-mark { from { opacity: 0; transform: scaleX(0.96); } }
 @media (prefers-reduced-motion: reduce) { .todo-row, .todo-row--drop-before::before, .todo-list__rows--drop-end::after { transition: none; animation: none; } }
 
-/* — timed todos: today's meetings sort by time at the end of the list, a little apart from the
-     user's own order. Dragging one only shows that it stays put. — */
-.todo-row:not(.todo-row--timed) + .todo-row--timed, .todo-list__rows > .todo-row--timed:first-child { margin-top: 10px; }
+/* — timed todos: today's meetings sort by time at the end of the list, after the user's own
+     order. Dragging one only shows that it stays put; its tick column links out to the event. — */
 .todo-row--timed .todo-row__main { cursor: pointer; }
 .todo-row--timed:not(.todo-row--current) .todo-row__title { color: var(--text-4); }
 .todo-row--timed:hover .todo-row__title { color: var(--text); }

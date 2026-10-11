@@ -268,7 +268,8 @@ class MeetingBoardTests(TestCase):
         TodoService.create(self.user, TodoTitleSchema(title="write the plan"))
         start = (timezone.now() + timedelta(minutes=30)).replace(second=0, microsecond=0)
         self.meeting = Todo.objects.create(user=self.user, kind=Todo.Kind.MEETING, title="Hiring panel", starts_at=start,
-                                           ends_at=start + timedelta(hours=1), meeting_url="https://zoom.us/j/1")
+                                           ends_at=start + timedelta(hours=1), meeting_url="https://zoom.us/j/1",
+                                           event_url="https://www.google.com/calendar/event?eid=abc")
 
     def test_the_list_is_one_list_dated_today(self):
         page = self.client.get(reverse("board:index"))
@@ -284,6 +285,15 @@ class MeetingBoardTests(TestCase):
         self.assertNotContains(page, 'aria-label="Delete todo"')
         self.assertContains(page, 'id="comment-input"')
 
+    def test_a_meeting_row_links_out_to_its_calendar_event(self):
+        page = self.client.get(reverse("board:index"))
+        self.assertContains(page, 'class="todo-row__tick todo-row__out" href="https://www.google.com/calendar/event?eid=abc" target="_blank"')
+
+    def test_the_meeting_stamp_moves_when_a_meeting_changes(self):
+        before = self.client.get(reverse("board:stamp")).json()["stamp"]
+        self.meeting.delete()
+        self.assertNotEqual(self.client.get(reverse("board:stamp")).json()["stamp"], before)
+
     def test_a_meeting_cannot_be_closed_or_renamed(self):
         self.assertEqual(self.client.post(reverse("board:todo-close", args=[self.meeting.id])).status_code, 403)
         self.assertEqual(self.client.post(reverse("board:todo-rename", args=[self.meeting.id]), {"title": "x"}).status_code, 403)
@@ -298,12 +308,20 @@ class SettingsTests(TestCase):
     def test_the_account_menu_opens_settings(self):
         self.assertContains(self.client.get(reverse("board:index")), f'hx-get="{reverse("board:settings")}"')
 
-    def test_turning_meetings_on_suggests_the_signed_in_calendar(self):
-        self.assertNotContains(self.client.get(reverse("board:settings")), "Connect <b>s@x.com</b>")
-        response = self.client.post(reverse("board:settings-meetings"), {"show_meetings": "1"})
+    def test_the_signed_in_google_calendar_is_suggested_first(self):
+        response = self.client.get(reverse("board:settings"))
         self.assertContains(response, "Connect <b>s@x.com</b>")
         self.assertContains(response, "hint=s%40x.com")
+
+    def test_turning_meetings_on_refreshes_the_board(self):
+        response = self.client.post(reverse("board:settings-meetings"), {"show_meetings": "1"})
         self.assertIn("board-changed", response["HX-Trigger"])
+
+    @override_settings(MICROSOFT_CLIENT_ID="id", MICROSOFT_CLIENT_SECRET="secret")
+    def test_only_google_is_offered_for_now(self):
+        response = self.client.get(reverse("board:settings"))
+        self.assertContains(response, reverse("calendars:connect", args=["google"]))
+        self.assertNotContains(response, reverse("calendars:connect", args=["microsoft"]))
 
     def test_choosing_a_time_zone_saves_it_and_refreshes_the_board(self):
         response = self.client.post(reverse("board:settings-timezone"), {"timezone": "Asia/Kolkata"})
@@ -353,7 +371,7 @@ class SettingsTests(TestCase):
         PreferenceService.set_show_meetings(self.user, True)
         CalendarConnection.objects.create(user=self.user, provider="google", email="s@x.com", refresh_token="x", status="disconnected")
         response = self.client.get(reverse("board:settings"))
-        self.assertContains(response, "lost access")
+        self.assertContains(response, "Lost access")
         self.assertContains(response, reverse("calendars:connect", args=["google"]) + "?hint=s%40x.com")
 
     def test_someone_elses_calendar_cant_be_switched(self):

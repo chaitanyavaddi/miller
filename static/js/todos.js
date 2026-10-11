@@ -255,6 +255,32 @@
   refreshAtMidnight();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshIfNewDay(); });
 
+  /* — live meetings: a calendar push changes a meeting on the server within seconds; every 30s the
+   *   board asks for its meetings' stamp and reloads when it moved. Never mid-typing, mid-drag or
+   *   with a modal open: it just tries again next time. — */
+  const stampUrl = document.getElementById('board-stamp')?.dataset.url;
+  let meetingStamp = null;
+
+  async function checkMeetings() {
+    if (!stampUrl || !list() || document.hidden) return;
+    let stamp;
+    try {
+      const response = await fetch(stampUrl, { headers: { Accept: 'application/json' } });
+      if (!response.ok) return;
+      stamp = (await response.json()).stamp;
+    } catch (_) { return; }
+    if (meetingStamp === null) { meetingStamp = stamp; return; }
+    if (stamp === meetingStamp) return;
+    const busy = isTyping(document.activeElement) || document.querySelector('.todo-row--dragging') || document.getElementById('overlay')?.children.length;
+    if (busy) return;
+    meetingStamp = stamp;
+    document.body.dispatchEvent(new Event('board-changed'));
+  }
+
+  checkMeetings();
+  setInterval(checkMeetings, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkMeetings(); });
+
   /* — empty list: no message, just the composer, ready to type into. On load and whenever the
    *   last open todo goes; never while searching or typing somewhere else. — */
   function focusComposerIfEmpty() {

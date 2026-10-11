@@ -28,7 +28,7 @@ def google_item(event_id, start, title="Design sync", **extra):
     return {
         "id": event_id, "iCalUID": f"uid-{event_id}", "summary": title, "status": "confirmed",
         "start": {"dateTime": start.isoformat()}, "end": {"dateTime": (start + timedelta(minutes=30)).isoformat()},
-        "hangoutLink": "https://meet.google.com/abc-defg-hij", **extra,
+        "hangoutLink": "https://meet.google.com/abc-defg-hij", "htmlLink": f"https://www.google.com/calendar/event?eid={event_id}", **extra,
     }
 
 
@@ -88,6 +88,7 @@ class EventParsingTests(TestCase):
         fields = GoogleCalendarApi.fields(google_item("e1", self.start))
         self.assertEqual((fields.title, fields.starts_at, fields.ical_uid), ("Design sync", self.start, "uid-e1"))
         self.assertEqual(fields.meeting_url, "https://meet.google.com/abc-defg-hij")
+        self.assertEqual(fields.event_url, "https://www.google.com/calendar/event?eid=e1")
 
     def test_google_cancelled_declined_all_day_and_working_location_events_are_skipped(self):
         self.assertIsNone(GoogleCalendarApi.fields(google_item("e", self.start, status="cancelled")))
@@ -105,11 +106,13 @@ class EventParsingTests(TestCase):
             "start": {"dateTime": "2026-10-12T09:00:00.0000000", "timeZone": "UTC"},
             "end": {"dateTime": "2026-10-12T09:30:00.0000000", "timeZone": "UTC"},
             "onlineMeeting": {"joinUrl": "https://teams.microsoft.com/l/meetup-join/1"},
+            "webLink": "https://outlook.office365.com/owa/?itemid=o1",
         }
         fields = MicrosoftCalendarApi.fields(item)
         self.assertEqual(fields.title, "Vendor check-in")
         self.assertEqual(fields.starts_at, datetime(2026, 10, 12, 9, 0, tzinfo=UTC))
         self.assertEqual(fields.meeting_url, "https://teams.microsoft.com/l/meetup-join/1")
+        self.assertEqual(fields.event_url, "https://outlook.office365.com/owa/?itemid=o1")
         self.assertIsNone(MicrosoftCalendarApi.fields({**item, "isAllDay": True}))
         self.assertIsNone(MicrosoftCalendarApi.fields({**item, "responseStatus": {"response": "declined"}}))
 
@@ -119,6 +122,7 @@ class MeetingSyncTests(CalendarTestCase):
         CalendarService.apply(self.source, remote("e1", self.start))
         meeting = Todo.objects.get(kind=Todo.Kind.MEETING)
         self.assertEqual((meeting.title, meeting.starts_at), ("Design sync", self.start))
+        self.assertEqual(meeting.event_url, "https://www.google.com/calendar/event?eid=e1")
 
     def test_a_moved_event_moves_its_meeting_and_keeps_its_thread(self):
         CalendarService.apply(self.source, remote("e1", self.start))
@@ -194,8 +198,9 @@ class MeetingSyncTests(CalendarTestCase):
 
 class ConnectionTests(CalendarTestCase):
     def test_tokens_are_stored_encrypted(self):
-        self.assertNotIn("r1", self.connection.refresh_token)
-        self.assertEqual(TokenVault.open(self.connection.refresh_token), "r1")
+        sealed = TokenVault.seal("1//refresh-token-from-google")
+        self.assertNotIn("refresh-token", sealed)
+        self.assertEqual(TokenVault.open(sealed), "1//refresh-token-from-google")
 
     def test_connecting_switches_the_primary_calendar_on_and_turns_meetings_on(self):
         user = IdentityService.create_user("b@x.com")
