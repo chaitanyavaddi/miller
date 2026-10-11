@@ -6,7 +6,6 @@ from django.db.models import F, Max, Q, QuerySet
 from django.utils import timezone
 
 from todos.models import Todo
-from todos.schemas import ReviewStatus
 from todos.services.history_service import PositionHistoryService
 
 
@@ -25,8 +24,8 @@ class TodoService:
         return Todo.objects.filter(closed_at__isnull=True, deleted_at__isnull=True)
 
     @staticmethod
-    def any_queryset() -> QuerySet:
-        return Todo.objects.all()
+    def closed_queryset() -> QuerySet:
+        return Todo.objects.filter(closed_at__isnull=False, deleted_at__isnull=True)
 
     @staticmethod
     def removed_queryset() -> QuerySet:
@@ -71,15 +70,10 @@ class TodoService:
                 .order_by(F("starts_at").asc(nulls_first=True), "position", "id"))
 
     @staticmethod
-    def reviewed(user, status: str, since) -> QuerySet:
-        """Todos in one state, newest first; `since` limits them to the period (None: all time)."""
-        if status == ReviewStatus.OPEN:
-            todos, stamp = TodoService.open_for(user).filter(kind=Todo.Kind.TASK).order_by("position"), "created_at"
-        elif status == ReviewStatus.DELETED:
-            todos, stamp = Todo.objects.filter(user=user, deleted_at__isnull=False).order_by("-deleted_at"), "deleted_at"
-        else:
-            todos, stamp = Todo.objects.filter(user=user, closed_at__isnull=False, deleted_at__isnull=True).order_by("-closed_at"), "closed_at"
-        return todos if since is None else todos.filter(**{f"{stamp}__gte": since})
+    def reviewed(user) -> QuerySet:
+        """The user's closed todos, the most recently closed first; deleted ones never show."""
+        return (Todo.objects.filter(user=user, kind=Todo.Kind.TASK, closed_at__isnull=False, deleted_at__isnull=True)
+                .order_by("-closed_at"))
 
     @staticmethod
     def recently_closed(user, limit: int) -> QuerySet:
@@ -124,11 +118,6 @@ class TodoService:
     @transaction.atomic
     def delete(todo: Todo) -> RemovedTodo:
         return TodoService._remove(todo, "deleted_at", Todo.Removal.DELETED)
-
-    @staticmethod
-    def purge(todo: Todo) -> None:
-        """Delete for good: only for a todo already in Deleted. Its comments and files go with it."""
-        todo.delete()
 
     @staticmethod
     @transaction.atomic

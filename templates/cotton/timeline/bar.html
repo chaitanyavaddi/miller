@@ -1,0 +1,13 @@
+<c-vars tab />
+{# All todos: Past and Scheduled tabs. Each loads once and stays while open, so switching keeps unsaved edits (timeline.js). #}
+<div class="timeline__bar">
+  <span class="eyebrow timeline__title" id="timeline-title">All todos</span>
+  <nav class="timeline__tabs" aria-label="All todos">
+    <button type="button" class="timeline__tab{% if tab == 'past' %} is-on{% endif %}" aria-current="{% if tab == 'past' %}page{% else %}false{% endif %}" data-timeline-tab="past"
+            hx-get="{% url 'board:review' %}" hx-target="#overlay" hx-swap="beforeend">Past</button>
+    <span class="timeline__dot" aria-hidden="true">·</span>
+    <button type="button" class="timeline__tab{% if tab == 'upcoming' %} is-on{% endif %}" aria-current="{% if tab == 'upcoming' %}page{% else %}false{% endif %}" data-timeline-tab="scheduled"
+            hx-get="{% url 'scheduled:index' %}" hx-target="#overlay" hx-swap="beforeend">Scheduled</button>
+  </nav>
+  <c-ui.icon-button label="Close" title="Close" class="icon-btn--small timeline__close" data-action="overlay-close"><c-ui.icon name="x" size="14" /></c-ui.icon-button>
+</div>

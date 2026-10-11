@@ -48,21 +48,21 @@
     return now.title !== row._original.title || FIELDS.some(k => (now[k] || '') !== (row._original[k] || ''));
   }
 
-  /* — the footer: what Save would do — */
+  /* — the footer: how many changes are waiting for Save (never worded as if already done) — */
   function summarise() {
     const root = modal();
     if (!root) return;
-    let added = 0, updated = 0, removed = 0;
+    let pending = 0;
     root.querySelectorAll('[data-row]').forEach(row => {
       const gone = row.classList.contains('is-removed');
       row.classList.toggle('is-changed', !gone && !!row.dataset.id && changed(row));
-      if (gone) removed++;
-      else if (!row.dataset.id) added++;
-      else if (changed(row)) updated++;
+      if (gone || !row.dataset.id || changed(row)) pending++;
     });
-    const parts = [[added, 'added'], [updated, 'updated'], [removed, 'removed']].filter(([n]) => n).map(([n, w]) => `${n} ${w}`);
-    root.querySelector('[data-summary]').textContent = parts.join(' · ');  /* empty until something changes */
-    root.querySelector('[data-empty]').hidden = !!root.querySelector('[data-row]:not(.is-removed)');
+    root.querySelector('[data-summary]').textContent =  /* empty until something changes */
+      pending ? `${pending} unsaved change${pending === 1 ? '' : 's'}` : '';
+    const any = !!root.querySelector('[data-row]:not(.is-removed)');
+    root.querySelector('[data-empty]').hidden = any;
+    root.querySelector('[data-head]').hidden = !any;
   }
 
   /* — the shared pickers — */

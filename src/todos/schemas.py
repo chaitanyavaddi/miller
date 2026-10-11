@@ -65,39 +65,3 @@ class TodoReopenSchema:
 
     def is_valid(self) -> bool:
         return True
-
-
-class ReviewStatus(models.TextChoices):
-    DONE    = "done",    "Done"
-    OPEN    = "open",    "Open"
-    DELETED = "deleted", "Deleted"
-
-
-class ReviewPeriod(models.TextChoices):
-    WEEK  = "week",  "This week"
-    MONTH = "month", "This month"
-    ALL   = "all",   "All time"
-
-
-@dataclass
-class ReviewFilterSchema:
-    status: str
-    period: str
-
-    @classmethod
-    def from_request(cls, request) -> "ReviewFilterSchema":
-        """Filters arrive in the query string when browsing and in the body with an action."""
-        source = request.POST if request.method == "POST" else request.GET
-        status = source.get("status", "").strip()
-        period = source.get("period", "").strip()
-        return cls(
-            status=status if status in ReviewStatus.values else ReviewStatus.DONE,
-            period=period if period in ReviewPeriod.values else ReviewPeriod.WEEK,
-        )
-
-    @property
-    def period_label(self) -> str:
-        return ReviewPeriod(self.period).label
-
-    def is_valid(self) -> bool:
-        return True

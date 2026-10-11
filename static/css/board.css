@@ -49,29 +49,28 @@
 .settings__more { display: flex; align-items: center; gap: 14px; }
 .settings__more-label { font-size: 13px; color: var(--text-4); }
 
-/* — review modal: filters, what the period adds up to, every todo in a table — */
+/* — Timeline: one modal, two tabs — Past (every todo, the most recently closed first)
+     and Scheduled. The same width and header for both, so switching never jumps. — */
+.timeline__bar { display: flex; align-items: center; gap: 18px; flex: none; }
+.timeline__title { margin-right: auto; }
+.timeline__tabs { display: flex; align-items: center; gap: 10px; }
+.timeline__tab { height: 24px; padding: 0; background: none; border: none; cursor: pointer; font-size: 13px; color: var(--text-4); text-underline-offset: 5px; }
+.timeline__tab:hover { color: var(--text); }
+.timeline__tab.is-on { color: var(--text); font-weight: 600; text-decoration: underline solid 1px; }
+.timeline__dot { color: var(--text-4); font-size: 12px; }
+
+/* — Past: the review — */
 /* Fixed height: switching between the table and a thread never moves anything above it. */
-.review { position: relative; max-width: 720px; width: 100%; height: min(680px, calc(100vh - 96px)); display: flex; flex-direction: column; gap: 24px; background: var(--bg); padding: 8px 0; }
-.review__filters { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.review__filter-group--period { margin-left: auto; }
-.review__close { margin-right: -6px; }
-.review__filter-group { display: flex; align-items: center; gap: 4px; }
-.review__filter { background: none; border: none; padding: 0 12px 0 0; height: 32px; cursor: pointer; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-4); text-underline-offset: 4px; }
-.review__filter:hover { color: var(--text); }
-.review__filter--active { color: var(--text); text-decoration: underline dotted; }
-.review__summary { display: flex; flex-direction: column; gap: 8px; }
-.review__headline { font-size: 22px; line-height: 1.35; font-weight: 500; letter-spacing: -0.025em; }
-.review__number { font-weight: 600; }
-.review__facts { font-size: 13px; line-height: 1.6; color: var(--text-3); }
-.review__facts:empty { display: none; }
+.timeline { height: min(680px, calc(100vh - 96px)); }  /* both tabs share one frame: switching never moves it */
+.review { position: relative; max-width: 720px; width: 100%; display: flex; flex-direction: column; gap: 24px; background: var(--bg); padding: 8px 0; }
 
 
-.review__body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.review__body { margin-top: 24px; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .review__table-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 12px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .review__table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.review__th { position: sticky; top: 0; background: var(--bg); text-align: left; font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0 8px; }
+.review__th { position: sticky; top: 0; background: var(--bg); text-align: left; font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0 8px; white-space: nowrap; }
 .review__th:nth-child(2) { width: 88px; }
-.review__th:nth-child(3) { width: 64px; }
+.review__th:nth-child(3) { width: 88px; }
 .review__th:nth-child(4) { width: 112px; }
 .review__th--right, .review__meta--right { text-align: right; padding-right: 16px; }
 .review__row:hover .review__title { color: var(--text); }

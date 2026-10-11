@@ -37,18 +37,10 @@
     if (selected) selected.value = row.dataset.id;
   }
 
-  /* From the review modal: show an open todo in the board. */
-  function showTodo(id) {
-    const row = document.querySelector(`.todo-row[data-id="${id}"]`);
-    if (row) row.querySelector('.todo-row__main').click();
-    document.dispatchEvent(new Event('overlay-close'));
-  }
-
   document.addEventListener('click', e => {
     const action = e.target.closest('[data-action]');
     if (action && action.dataset.action === 'search-open') openSearch();
     if (action && action.dataset.action === 'search-close') closeSearch();
-    if (action && action.dataset.action === 'select-todo') showTodo(action.dataset.todoId);
     if (isSearching() && !e.target.closest('#list')) closeSearch();  /* clicking away puts the search back to its icon */
     const main = e.target.closest('.todo-row__main');
     if (main) select(main.closest('.todo-row'));

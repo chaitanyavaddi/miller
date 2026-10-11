@@ -1,13 +1,16 @@
 <c-vars rows rhythms months weekdays month_days />
-<div class="overlay">
+<div class="overlay" data-timeline-pane="scheduled">
   <div class="overlay__scrim" aria-hidden="true"></div>  {# closes only by ✕ (discard) or Save #}
-  <div class="scheduled" role="dialog" aria-modal="true" aria-labelledby="scheduled-title" data-scheduled>
-    <div class="scheduled__bar">
-      <span class="eyebrow" id="scheduled-title">Scheduled todos</span>
-      <c-ui.icon-button label="Close without saving" title="Close without saving" class="icon-btn--small" data-action="overlay-close"><c-ui.icon name="x" size="14" /></c-ui.icon-button>
-    </div>
+  <div class="scheduled timeline" role="dialog" aria-modal="true" aria-labelledby="timeline-title" data-scheduled>
+    <c-timeline.bar tab="upcoming" />
     <c-ui.messages />
 
+    {# Column names, laid out like a row so they line up; hidden while nothing's scheduled. #}
+    <div class="todo-row scheduled-row scheduled__head" data-head aria-hidden="true"{% if not rows %} hidden{% endif %}>
+      <span class="scheduled-row__title">Todo</span>
+      <span class="scheduled-row__when"><span>Repeats</span><span>On</span></span>
+      <span class="todo-row__actions"><span class="todo-row__action"></span></span>
+    </div>
     <div class="scheduled__rows" data-rows>
       {% for row in rows %}<c-scheduled.row :row="row" :weekdays="weekdays" />{% endfor %}
     </div>

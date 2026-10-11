@@ -27,11 +27,11 @@ class GuestSessionTests(TestCase):
         self.assertContains(page, 'title="Sign in to keep your todos"')
         self.assertNotContains(page, "Log out")
 
-    def test_avatar_menu_lists_the_keyboard_shortcuts(self):
-        page = self.client.get(reverse("board:index"))
+    def test_settings_lists_the_keyboard_shortcuts_not_the_avatar_menu(self):
+        self.assertNotContains(self.client.get(reverse("board:index")), "Move through todos")
+        settings = self.client.get(reverse("board:settings"))
         for what in ("Move through todos", "Move a todo up or down", "New todo", "Search"):
-            self.assertContains(page, what)
-        self.assertNotContains(page, "composer__key")
+            self.assertContains(settings, what)
 
     def test_signed_in_avatar_menu_shows_the_name_and_log_out(self):
         self.client.force_login(IdentityService.create_user("ada@x.com", name="Ada"))

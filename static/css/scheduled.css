@@ -3,15 +3,19 @@
    that needs (a date, the days, the day of the month). Ink on paper: the chosen thing is dark and underlined. */
 
 /* — the screen — */
-.scheduled { position: relative; width: 100%; max-width: 640px; max-height: calc(100vh - 96px); display: flex; flex-direction: column; gap: 24px;
+.scheduled { position: relative; width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 24px;
   padding: 8px 0; background: var(--bg); }
 .scheduled__bar { display: flex; align-items: center; justify-content: space-between; }
-.scheduled__rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; margin: 0 -4px; padding: 0 4px; display: flex; flex-direction: column; gap: 4px;
+.scheduled__rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; margin: 0 -4px; padding: 0 4px; display: flex; flex-direction: column; gap: 0;
   scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-.scheduled__rows .todo-row { min-height: 40px; }
+.scheduled__rows .todo-row { height: 44px; }  /* a touch more air than Past's rows: these are edited in place */
+/* The column names, as Past's table has them: the same air below the tabs, close above the rows. */
+.scheduled__head { height: 22px; min-height: 0; align-items: flex-start; margin: 24px 0 -24px; font-family: var(--font-mono); font-size: 11px; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; }
+.scheduled__head[hidden] { display: none; }
+.scheduled__head::before { content: none; }
 .scheduled__empty { padding: 8px 0; font-size: 13px; color: var(--text-4); }
-.scheduled__foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 14px; border-top: 1px dotted var(--border); }
-.scheduled__summary { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }  /* what Save would do: 2 updated · 1 added */
+.scheduled__foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 14px; border-top: 1px dotted var(--border); }
+.scheduled__summary { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }  /* waiting for Save: 3 unsaved changes */
 .scheduled__add { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0; background: none; border: none; cursor: pointer;
   font: inherit; font-size: 13.5px; color: var(--text-4); align-self: flex-start; }
 .scheduled__add:hover, .scheduled__add:hover .composer__plus { color: var(--text); }

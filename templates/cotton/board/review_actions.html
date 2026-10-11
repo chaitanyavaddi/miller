@@ -1,13 +1,5 @@
-<c-vars row filters quiet="" />
-<span class="review__actions">
-  {% if row.can_reopen %}
-  <c-ui.text-button class="text-btn--small" hx-post="{% url 'board:todo-reopen' row.id %}" hx-vals='{"index": 1, "select": "1"}' hx-target="#workspace" hx-swap="outerHTML">{% if row.status == "deleted" %}Restore{% else %}Reopen{% endif %}</c-ui.text-button>
-  {% else %}
-  <c-ui.text-button class="text-btn--small" data-action="select-todo" data-todo-id="{{ row.id }}">Show</c-ui.text-button>
-  {% endif %}
-  {% if row.status == "deleted" %}
-  <c-ui.icon-button label="Delete for good" title="Delete for good" class="icon-btn--small{% if quiet %} icon-btn--quiet{% endif %}" hx-post="{% url 'board:review-delete' row.id %}" hx-vals='{"status": "{{ filters.status }}", "period": "{{ filters.period }}"}' hx-include="#board-state" hx-target="#overlay" hx-swap="innerHTML" hx-confirm="Delete “{{ row.title }}” for good? This can’t be undone."><c-ui.icon name="trash" size="14" sw="1.6" /></c-ui.icon-button>
-  {% else %}
-  <c-ui.icon-button label="Delete" title="Delete" class="icon-btn--small{% if quiet %} icon-btn--quiet{% endif %}" hx-post="{% url 'board:review-delete' row.id %}" hx-vals='{"status": "{{ filters.status }}", "period": "{{ filters.period }}"}' hx-include="#board-state" hx-target="#overlay" hx-swap="innerHTML"><c-ui.icon name="trash" size="14" sw="1.6" /></c-ui.icon-button>
-  {% endif %}
+<c-vars row quiet="" />
+<span class="review__actions">  {# reopen always shows; delete comes up on the row's hover #}
+  <c-ui.icon-button label="Reopen" title="Reopen" class="icon-btn--small" hx-post="{% url 'board:todo-reopen' row.id %}" hx-vals='{"index": 1, "select": "1"}' hx-target="#workspace" hx-swap="outerHTML"><c-ui.icon name="reopen" size="14" sw="1.6" /></c-ui.icon-button>
+  <c-ui.icon-button label="Delete" title="Delete" class="icon-btn--small{% if quiet %} icon-btn--quiet{% endif %}" hx-post="{% url 'board:review-delete' row.id %}" hx-include="#board-state" hx-target="closest .overlay" hx-swap="outerHTML"><c-ui.icon name="trash" size="14" sw="1.6" /></c-ui.icon-button>
 </span>

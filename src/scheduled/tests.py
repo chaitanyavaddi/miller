@@ -130,10 +130,12 @@ class ScheduledModalTests(TestCase):
         return self.client.post(reverse("scheduled:save"), data)
 
     def test_the_nav_opens_a_modal_that_saves_only_on_save(self):
-        self.assertContains(self.client.get(reverse("board:index")), f'hx-get="{reverse("scheduled:index")}"')
+        self.assertContains(self.client.get(reverse("board:index")), f'hx-get="{reverse("board:review")}"')  # the nav opens on Past
         modal = self.client.get(reverse("scheduled:index"))
-        self.assertContains(modal, "Scheduled todos")
-        self.assertContains(modal, 'aria-label="Close without saving"')
+        self.assertContains(modal, 'id="timeline-title">All todos</span>')    # All todos, on its Scheduled tab
+        self.assertContains(modal, 'class="timeline__tab is-on" aria-current="page" data-timeline-tab')
+        self.assertContains(modal, f'hx-get="{reverse("board:review")}"')    # the Past tab
+        self.assertContains(modal, 'aria-label="Close"')
         self.assertContains(modal, f'hx-post="{reverse("scheduled:save")}"')
         self.assertNotContains(modal, "hx-post=\"/scheduled/1")  # nothing posts on its own
 

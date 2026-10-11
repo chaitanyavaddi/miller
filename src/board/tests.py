@@ -192,62 +192,50 @@ class BoardTests(TestCase):
         self.assertContains(response, "form-message--error")
         self.assertEqual(Comment.objects.count(), 0)
 
-    def test_review_shows_what_the_week_adds_up_to(self):
+    def test_all_todos_lists_only_closed_todos_most_recent_first(self):
         TodoService.close(self.todos[0])
+        TodoService.close(self.todos[1])
+        Todo.objects.filter(pk=self.todos[0].pk).update(closed_at=timezone.now() - timedelta(days=2))
         response = self.client.get(self.url("review"))
-        self.assertContains(response, 'You closed <span class="review__number">1</span> todo this week.')
-        self.assertContains(response, "Reopen")
-        self.assertNotContains(response, "review-chart")
+        titles = [row.title for row in response.context["rows"]]
+        self.assertEqual(titles, ["todo 2", "todo 1"])  # todo 3 is still open: not listed
+        self.assertContains(response, 'id="timeline-title">All todos</span>')
+        self.assertContains(response, 'aria-label="Reopen"', count=2)
+        self.assertNotContains(response, "review__filter")
 
-    def test_review_filters_fall_back_to_done_this_week(self):
-        response = self.client.get(self.url("review"), {"status": "bogus", "period": "bogus"})
-        self.assertContains(response, 'review__filter review__filter--active" aria-pressed="true"', count=2)
-
-    def test_review_lists_open_todos_with_a_show_action(self):
-        response = self.client.get(self.url("review"), {"status": "open", "period": "all"})
-        self.assertContains(response, 'data-action="select-todo"', count=3)
+    def test_deleted_and_open_todos_never_show_in_all_todos(self):
+        TodoService.close(self.todos[0])
+        TodoService.delete(self.todos[0])
+        response = self.client.get(self.url("review"))
+        self.assertNotContains(response, "todo 1")
+        self.assertEqual(self.client.get(self.url("review-thread", self.todos[0])).status_code, 404)
+        self.assertEqual(self.client.get(self.url("review-thread", self.todos[1])).status_code, 404)  # still open
 
     def test_a_closed_todos_thread_is_readable_in_the_review(self):
         from comments.schemas import CommentCreateSchema
         from comments.service import CommentService
         CommentService.add(self.todos[0], CommentCreateSchema(body="what I learned"))
         TodoService.close(self.todos[0])
-        response = self.client.get(self.url("review-thread", self.todos[0]), {"status": "done", "period": "all"})
+        response = self.client.get(self.url("review-thread", self.todos[0]))
         self.assertContains(response, "what I learned")
         self.assertContains(response, "Closed ")
-        self.assertContains(response, "Reopen")
-        self.assertContains(response, "?status=done&period=all")  # back keeps the filters
+        self.assertContains(response, 'aria-label="Reopen"')
         self.assertNotContains(response, 'id="comment-form"')
         self.assertNotContains(response, 'class="overlay"')  # only the table area is replaced
 
-    def test_deleting_from_review_moves_a_todo_to_deleted_and_refreshes_the_board(self):
-        response = self.client.post(self.url("review-delete", self.todos[0]), {"status": "open", "period": "all", "t": self.todos[1].id})
+    def test_deleting_from_all_todos_soft_deletes_and_refreshes_the_board(self):
+        TodoService.close(self.todos[0])
+        response = self.client.post(self.url("review-delete", self.todos[0]), {"t": self.todos[1].id})
         self.todos[0].refresh_from_db()
-        self.assertIsNotNone(self.todos[0].deleted_at)
-        self.assertContains(response, 'class="review"')
+        self.assertIsNotNone(self.todos[0].deleted_at)  # kept in the database
+        self.assertContains(response, 'class="review timeline"')
+        self.assertNotContains(response, "todo 1")
         self.assertContains(response, 'id="workspace" hx-swap-oob="true"')
         self.assertContains(response, "#1 today")  # the board's thread moved to the next todo
 
-    def test_deleting_a_deleted_todo_removes_it_and_its_files_for_good(self):
-        import os
-        from comments.schemas import CommentCreateSchema
-        from comments.service import CommentService
-        upload = SimpleUploadedFile("note.txt", b"hi", content_type="text/plain")
-        path = CommentService.add(self.todos[0], CommentCreateSchema(body="", files=[upload])).attachments.get().file.path
-        TodoService.delete(self.todos[0])
-        response = self.client.post(self.url("review-delete", self.todos[0]), {"status": "deleted", "period": "all"})
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(TodoService.any_queryset().filter(pk=self.todos[0].pk).exists())
-        self.assertFalse(Comment.objects.exists())
-        self.assertFalse(os.path.exists(path))
-
-    def test_a_deleted_todo_asks_before_deleting_for_good(self):
-        TodoService.delete(self.todos[0])
-        response = self.client.get(self.url("review"), {"status": "deleted", "period": "all"})
-        self.assertContains(response, "for good? This can’t be undone.")
-
     def test_review_rows_open_their_thread(self):
-        response = self.client.get(self.url("review"), {"status": "open", "period": "all"})
+        TodoService.close(self.todos[0])
+        response = self.client.get(self.url("review"))
         self.assertContains(response, reverse("board:review-thread", args=[self.todos[0].id]))
 
     def test_reopening_from_review_puts_it_on_top_selects_it_and_closes_the_modal(self):
@@ -265,9 +253,10 @@ class BoardTests(TestCase):
         self.assertEqual(self.client.post(self.url("todo-close", self.todos[0])).status_code, 403)
         self.assertEqual(self.client.post(self.url("comment-create", self.todos[0]), {"body": "x"}).status_code, 403)
         self.assertEqual(self.client.post(self.url("todo-rename", self.todos[0]), {"title": "mine now"}).status_code, 403)
+        TodoService.close(self.todos[0])  # All todos only reaches closed ones
         self.assertEqual(self.client.get(self.url("review-thread", self.todos[0])).status_code, 403)
         self.assertEqual(self.client.post(self.url("review-delete", self.todos[0])).status_code, 403)
-        self.assertNotContains(self.client.get(self.url("review"), {"period": "all", "status": "open"}), "todo 1")
+        self.assertNotContains(self.client.get(self.url("review")), "todo 1")
 
 
 
