@@ -49,17 +49,16 @@ Meetings come from the user's Google and Outlook calendars, read directly throug
 
 ## Background jobs
 
-[django-q2](https://django-q2.readthedocs.io/), with its queue and schedules in the database (no Redis). Every recurring job is listed in `jobs/schedules.py`; `python manage.py ensure_schedules` writes them (the web container runs it on start). One-off jobs, like a recording to transcribe, are queued where they happen. The cluster runs as its own process: `python manage.py qcluster` (locally, in a second terminal). Settings: `Q_CLUSTER` in `config/settings/base.py`, `Q_WORKERS` (default 2). Finished and failed jobs are kept in its tables (`django_q_success`, `django_q_failure`).
+[django-q2](https://django-q2.readthedocs.io/), with its queue and schedules in the database (no Redis). Every recurring job is listed in `jobs/schedules.py`; `python manage.py ensure_schedules` writes them (the web container runs it on start). One-off jobs, like a recording to transcribe, are queued where they happen. In Docker the cluster runs inside the same container as the web; locally, run `python manage.py qcluster` in a second terminal. Settings: `Q_CLUSTER` in `config/settings/base.py`, `Q_WORKERS` (default 2). Finished and failed jobs are kept in its tables (`django_q_success`, `django_q_failure`).
 
 ## Docker
 
 ```sh
 docker build -t plain .
-docker run -p 8000:8000 --env-file .env.prod -v plain-media:/app/media plain           # web: migrates, schedules, serves
-docker run --env-file .env.prod -v plain-media:/app/media plain worker                  # jobs: the qcluster
+docker run -p 8000:8000 --env-file .env.prod -v plain-media:/app/media plain   # migrates, schedules, serves, and runs the job worker
 ```
 
-Prod needs `SECRET_KEY`, `GOOGLE_*`, `SITE_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `DB_*`. Run both containers from the same image with the same env and **the same media volume** (the worker reads the recordings' audio from it).
+Prod needs `SECRET_KEY`, `GOOGLE_*`, `SITE_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `DB_*`. One container does everything: the web and the job worker run side by side, and if either stops the container exits so the host restarts it. To split the worker out, run a second container from the same image with `worker` (same env, same media volume) and set `RUN_WORKER=0` on the web one.
 
 ## Tests
 
