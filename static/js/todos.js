@@ -267,16 +267,25 @@
     if (stamp === meetingStamp) return;
     if (busy()) return;
     meetingStamp = stamp;
-    document.body.dispatchEvent(new Event('board-changed'));
+    reloadBoard();
   }
 
-  const busy = () => isTyping(document.activeElement) || document.querySelector('.todo-row--dragging') || document.getElementById('overlay')?.children.length;
+  /* Typing means words in a field: an empty composer that merely holds the cursor doesn't hold the board back. */
+  const typing = el => isTyping(el) && (el.isContentEditable || !!el.value);
+  const busy = () => typing(document.activeElement) || document.querySelector('.todo-row--dragging') || document.getElementById('overlay')?.children.length;
 
   let pendingLive = false;
   function liveChanged() {
     if (busy()) { pendingLive = true; return; }  /* refresh once whatever's going on is over */
     pendingLive = false;
     meetingStamp = null;  /* the next stamp check takes the new state as its starting point */
+    reloadBoard();
+  }
+
+  function reloadBoard() {
+    if (document.activeElement?.id === 'comment-input') {  /* the cursor was in the composer: it's back there after */
+      document.addEventListener('htmx:after:swap', () => document.getElementById('comment-input')?.focus(), { once: true });
+    }
     document.body.dispatchEvent(new Event('board-changed'));
   }
   document.addEventListener('meetings-changed', liveChanged, true);
