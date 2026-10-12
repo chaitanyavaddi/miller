@@ -1,0 +1,25 @@
+<c-vars row months weekdays action />
+{% comment %}Move to…: one row of the Scheduled tab. The todo's title, its date (the same chip and calendar),
+Save. "Once" is set and not shown; the same todo, thread and all, comes back that day. scheduled.js runs it.{% endcomment %}
+<div class="overlay">
+  <button type="button" class="overlay__scrim" aria-label="Close" data-action="overlay-close"></button>
+  <div class="scheduled scheduled--move" role="dialog" aria-modal="true" aria-labelledby="move-title" data-scheduled data-move>
+    <div class="timeline__bar">
+      <span class="eyebrow timeline__title" id="move-title">Move to</span>
+      <c-ui.icon-button label="Close" title="Close" class="icon-btn--small timeline__close" data-action="overlay-close"><c-ui.icon name="x" size="14" /></c-ui.icon-button>
+    </div>
+    <c-ui.messages />
+    <div class="scheduled__rows" data-rows><c-scheduled.row :row="row" :weekdays="weekdays" /></div>
+
+    <div class="popover popover--calendar" data-panel="date" role="dialog" aria-label="Date" hidden>
+      <c-scheduled.calendar :months="months" draft="1" />
+    </div>
+
+    <p class="form-message form-message--error scheduled__error" data-error role="alert" hidden></p>
+    <form class="scheduled__foot" data-save-form hx-post="{{ action }}" hx-swap="none">
+      {% csrf_token %}
+      <span class="scheduled__summary" data-summary></span>
+      <button type="submit" class="scheduled__save">Save</button>
+    </form>
+  </div>
+</div>

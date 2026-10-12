@@ -4,6 +4,11 @@
 .comment__body { display: flex; flex-direction: column; gap: 2px; }
 .comment__text { font-size: 13.5px; line-height: 1.6; color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
 /* A line Miller wrote itself (where a todo came from): history, not conversation. */
+/* A link in an update: the product's dotted underline, its own colour, an outward arrow; opens in a new tab. */
+.comment__link { color: var(--text); text-decoration: underline dotted; text-underline-offset: 4px; text-decoration-color: var(--text-4); }
+.comment__link:hover { text-decoration-color: var(--text); }
+.comment__link-out { display: inline-block; margin-left: 3px; vertical-align: -1px; color: var(--text-4); }
+.comment__link:hover .comment__link-out { color: var(--text); }
 .comment--automatic .comment__text { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }
 .comment__files { display: flex; flex-direction: column; align-items: flex-start; }
 

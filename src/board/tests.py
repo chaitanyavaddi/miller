@@ -34,6 +34,14 @@ class BoardTests(TestCase):
         self.assertContains(page, "#1 today")
         self.assertContains(page, "todo-row--current")
 
+    def test_the_thread_menu_offers_move_to_and_delete(self):
+        page = self.client.get(self.at(self.todos[1]))
+        self.assertContains(page, 'data-action="thread-menu"')
+        self.assertContains(page, f'hx-post="{self.url("todo-close", self.todos[1])}"', count=2)  # its row's tick and the thread's Mark done
+        self.assertContains(page, f'hx-get="{reverse("scheduled:move", args=[self.todos[1].id])}"')
+        self.assertContains(page, f'hx-post="{self.url("todo-delete", self.todos[1])}"')
+        self.assertNotContains(page, 'aria-label="Delete todo"')  # no longer beside the title
+
     def test_the_thread_spells_out_its_age_from_yesterday_on(self):
         page = self.client.get(self.url("index"))
         self.assertContains(page, "#1 today</b></span>")                # added today: nothing more to say
@@ -87,7 +95,7 @@ class BoardTests(TestCase):
         self.assertIn('aria-label="Mark todo 2 done"', html)
         thread = self.client.get(self.url("todo-detail", self.todos[0])).content.decode()
         self.assertIn("Done today</b>", thread)                                        # done, not a number or its age
-        self.assertIn('thread__done--on', thread)
+        self.assertIn('>Mark not done</button>', thread)
         self.client.post(self.url("todo-reopen", self.todos[0]), {"index": 99})
         self.assertEqual(list(TodoService.open_for(self.user).values_list("title", flat=True)), ["todo 1", "todo 2", "todo 3"])
 
@@ -152,11 +160,18 @@ class BoardTests(TestCase):
         self.assertContains(response, "Write something first")
         self.assertNotContains(response, "hx-swap-oob")
 
-    def test_the_thread_marks_done_with_a_tick_and_deletes_from_the_title_line(self):
+    def test_a_todo_done_today_can_still_be_deleted(self):
+        self.client.post(self.url("todo-close", self.todos[0]))
+        response = self.client.post(self.url("todo-delete", self.todos[0]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "toast__item")
+        self.todos[0].refresh_from_db()
+        self.assertIsNotNone(self.todos[0].deleted_at)
+
+    def test_the_thread_marks_done_with_a_button(self):
         page = self.client.get(self.url("index"))
-        self.assertContains(page, 'aria-label="Mark done"')
-        self.assertContains(page, 'class="icon-btn icon-btn--small icon-btn--quiet" aria-label="Delete todo"')
-        self.assertNotContains(page, ">Mark done<")
+        self.assertContains(page, '>Mark done</button>')
+        self.assertContains(page, 'class="account-menu thread-menu" id="thread-menu"')  # the menu is drawn as the account menu
 
     def test_reorder_returns_the_selected_thread_with_its_new_position(self):
         ids = ",".join(str(t.id) for t in reversed(self.todos))

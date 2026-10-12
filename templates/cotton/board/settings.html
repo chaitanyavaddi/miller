@@ -46,7 +46,6 @@ what it does on the left; its value, and the way to change it, sit on the right.
               <c-ui.google size="14" class="calendar-pill__mark" />
               <span class="calendar-pill__email" title="{{ connection.email }}{% if connection.status != 'connected' %}: lost access{% endif %}">{{ connection.email }}</span>
               {% if connection.status == "connected" %}
-              <span class="calendar-pill__state">Connected</span>
               <a class="icon-btn icon-btn--small calendar-pill__open" href="{{ connection.calendar_url }}" target="_blank" rel="noopener" aria-label="Open {{ connection.email }}'s calendar" title="Open calendar"><c-ui.icon name="out" size="13" sw="1.8" /></a>
               {% else %}
               <a class="text-btn text-btn--small calendar-pill__reconnect" href="{% url 'calendars:connect' connection.provider %}?hint={{ connection.email|urlencode }}">Reconnect</a>

@@ -54,7 +54,8 @@ class TodoCloseView(TodoPermissionRequiredMixin, BoardResponseMixin, View):
         return self.render_after_removal(TodoService.close(self.todo))
 
 
-class TodoDeleteView(TodoPermissionRequiredMixin, BoardResponseMixin, View):
+class TodoDeleteView(LiveTodoMixin, TodoPermissionRequiredMixin, BoardResponseMixin, View):
+    """Delete an open todo, or one done today (its thread's menu offers it either way)."""
     permission_required = "todos.delete_todo"
 
     def post(self, request, pk):

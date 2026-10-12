@@ -5,7 +5,10 @@ from django.db import models
 class ScheduledItem(models.Model):
     """Something that comes back, or can't start until a date. It never sits in today's list itself:
     on each day it falls on, it produces a normal todo at the top of the list. It's about days, not
-    hours. `last_produced_on` makes sure that happens at most once a day."""
+    hours. `last_produced_on` makes sure that happens at most once a day.
+
+    A once item can also hold an existing `todo` that was moved to a date: the todo is off today's list
+    while the item waits, and on the day the same todo (and its thread) comes back instead of a new one."""
 
     class Rhythm(models.TextChoices):
         ONCE    = "once",    "Once"
@@ -19,6 +22,7 @@ class ScheduledItem(models.Model):
     weekdays         = models.CharField(max_length=20, blank=True)                # weekly: "0,3" (Monday is 0)
     month_day        = models.PositiveSmallIntegerField(null=True, blank=True)    # monthly: 1–31
     last_produced_on = models.DateField(null=True, blank=True)
+    todo             = models.ForeignKey("todos.Todo", on_delete=models.CASCADE, null=True, blank=True, related_name="moves")
     created_at       = models.DateTimeField(auto_now_add=True)
     updated_at       = models.DateTimeField(auto_now=True)
 

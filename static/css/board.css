@@ -5,10 +5,16 @@
 
 .thread__crumb { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; }
 .thread__crumb-strong { font-weight: 400; color: var(--text); }
-.thread__done--on { color: var(--text); }  /* the thread's tick, set: click it and it's not done */
 .thread__heading { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding-right: 12px; flex: none; }
 .thread__heading:hover .icon-btn--quiet { opacity: 1; }
-.thread__done { justify-content: flex-end; }
+/* Mark done and ⋮ sit together at the bar's right; ⋮ opens the todo's menu, which is the account menu's
+   frame and items (main.css), placed under its button. */
+.thread__actions { position: relative; display: flex; align-items: center; gap: 8px; }
+.thread__done-btn { display: inline-flex; align-items: center; color: var(--text-3); }
+.thread__done-btn:hover { color: var(--text); }
+.thread__more { color: var(--text-4); }
+.thread__more:hover, .thread__more[aria-expanded="true"] { color: var(--text); }
+.thread-menu { top: 28px; width: 200px; }
 .thread__title { margin: 0; height: 24px; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.025em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; }
 
 /* The thread title is the rename field: it looks like the heading until it has focus. */
@@ -32,7 +38,7 @@
      "Settings", in a todo row's position column (44px + 14px); a section's rows start where its name
      does. Each row names a setting and says what it does on the left; its value and controls sit on
      the right. Space separates, not lines. — */
-.settings { position: relative; max-width: 640px; width: 100%; height: min(680px, calc(100vh - 96px)); display: flex; flex-direction: column; background: var(--bg); padding: 8px 0; }
+.settings { position: relative; max-width: 640px; width: 100%; height: min(680px, calc(100vh - var(--overlay-top) - 24px)); display: flex; flex-direction: column; background: var(--bg); padding: 8px 0; }
 .settings__body { margin-top: 24px; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 12px; counter-reset: settings;
   scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .settings__notice { margin: 0 0 16px 58px; font-size: 13px; line-height: 20px; color: var(--text); }
@@ -55,17 +61,16 @@
 .settings__label { font-size: 13.5px; line-height: 20px; color: var(--text); }
 .settings__hint { margin-top: 2px; font-size: 12.5px; line-height: 18px; color: var(--text-4); }
 .settings__control { flex: none; margin-left: auto; display: flex; align-items: center; gap: 16px; }
-.settings__control--stack { flex: 0 0 320px; min-width: 0; flex-direction: column; align-items: stretch; gap: 8px; }
+.settings__control--stack { flex: 0 0 300px; min-width: 0; flex-direction: column; align-items: stretch; gap: 0; }
 .settings__select { appearance: none; -webkit-appearance: none; height: 20px; margin: 0; font: inherit; font-size: 13.5px; color: var(--text); background: transparent; border: none;
   padding: 0; text-align: right; text-align-last: right; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 4px; }
 .settings__add { align-self: flex-end; margin-top: 4px; }
 .settings__add:first-child { margin-top: 0; }  /* alone in the column (a guest): level with the label */
 
-/* A connected calendar: a wide pill with the provider's mark, the account, its state and two quiet actions. */
-.calendar-pill { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 6px 0 14px; border: 1px solid var(--border); border-radius: 8px; }
+/* A connected calendar: one plain line, the provider's mark, the account and two quiet actions. Listed means connected. */
+.calendar-pill { display: flex; align-items: center; gap: 10px; height: 32px; }
 .calendar-pill__mark { flex: none; }
-.calendar-pill__email { flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.calendar-pill__state { flex: none; display: inline-flex; align-items: center; height: 20px; font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }
+.calendar-pill__email { flex: 1 1 auto; min-width: 0; font-size: 13.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .calendar-pill__open, .calendar-pill__remove { flex: none; color: var(--text-4); }
 .calendar-pill__open:hover, .calendar-pill__remove:hover { color: var(--text); }
 .calendar-pill--lost .calendar-pill__email { color: var(--text-4); }
@@ -97,7 +102,7 @@
 
 /* — Past: the review — */
 /* Fixed height: switching between the table and a thread never moves anything above it. */
-.timeline { height: min(680px, calc(100vh - 96px)); }  /* both tabs share one frame: switching never moves it */
+.timeline { height: min(680px, calc(100vh - var(--overlay-top) - 24px)); }  /* both tabs share one frame: switching never moves it */
 .review { position: relative; max-width: 720px; width: 100%; display: flex; flex-direction: column; gap: 24px; background: var(--bg); padding: 8px 0; }
 
 

@@ -7,11 +7,21 @@
     {% if current.meeting_url %}<a class="text-btn text-btn--small thread__join" href="{{ current.meeting_url }}" target="_blank" rel="noopener">Join</a>{% endif %}
     {% else %}
     <span class="thread__crumb">{% if current.is_done %}<b class="thread__crumb-strong">Done today</b>{% else %}<b class="thread__crumb-strong">#{{ current.position }} today</b>{% endif %}{% if current.schedule_label %} · {{ current.schedule_label }}{% elif current.from_schedule %} · from scheduled{% endif %}{% if current.shows_age %} · {{ current.added }}{% endif %}</span>
-    {% if current.is_done %}
-    <c-ui.icon-button label="Done — mark not done" title="Not done" class="icon-btn--small thread__done thread__done--on" hx-post="{% url 'board:todo-reopen' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML"><c-ui.icon name="check" size="14" sw="2" /></c-ui.icon-button>
-    {% else %}
-    <c-ui.icon-button label="Mark done" title="Mark done" class="icon-btn--small thread__done" hx-post="{% url 'board:todo-close' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML"><c-ui.icon name="check" size="14" sw="1.8" /></c-ui.icon-button>
-    {% endif %}
+    <span class="thread__actions">
+      {% if current.is_done %}
+      <c-ui.text-button class="text-btn--small thread__done-btn" hx-post="{% url 'board:todo-reopen' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML">Mark not done</c-ui.text-button>
+      {% else %}
+      <c-ui.text-button class="text-btn--small thread__done-btn" hx-post="{% url 'board:todo-close' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML">Mark done</c-ui.text-button>
+      {% endif %}
+      <c-ui.icon-button label="More" title="More" class="icon-btn--small thread__more" data-action="thread-menu" aria-haspopup="menu" aria-controls="thread-menu" aria-expanded="false"><c-ui.icon name="more" size="14" /></c-ui.icon-button>
+      {# Drawn exactly as the account menu: its frame, its section, its text buttons. #}
+      <div class="account-menu thread-menu" id="thread-menu" role="menu">
+        <div class="account-menu__section">
+          <c-ui.text-button class="account-menu__action" role="menuitem" hx-get="{% url 'scheduled:move' current.id %}" hx-target="#overlay" hx-swap="innerHTML">Move to…</c-ui.text-button>
+          <c-ui.text-button class="account-menu__action" role="menuitem" hx-post="{% url 'board:todo-delete' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML">Delete</c-ui.text-button>
+        </div>
+      </div>
+    </span>
     {% endif %}
   </div>
   <div class="thread__heading">
@@ -19,7 +29,6 @@
     <h1 class="thread__title" title="From your calendar · read only">{{ current.title }}</h1>
     {% else %}
     <c-todos.title-form :todo="current" />
-    <c-ui.icon-button label="Delete todo" title="Delete" class="icon-btn--small icon-btn--quiet" hx-post="{% url 'board:todo-delete' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML"><c-ui.icon name="trash" size="14" sw="1.6" /></c-ui.icon-button>
     {% endif %}
   </div>
   <div class="thread__comments">

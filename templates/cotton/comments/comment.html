@@ -2,7 +2,7 @@
 <div class="comment{% if comment.automatic %} comment--automatic{% endif %}">
   <time class="comment__time" datetime="{{ comment.created_at|date:'c' }}">{{ comment.created_at|date:"M j, H:i" }}</time>
   <div class="comment__body">
-    {% if comment.body %}<p class="comment__text">{{ comment.body }}</p>{% endif %}
+    {% if comment.body %}<p class="comment__text">{{ comment.body|linkify }}</p>{% endif %}
     {% with attachments=comment.attachments.all %}
     {% if attachments %}
     <div class="comment__files">

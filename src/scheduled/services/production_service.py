@@ -7,6 +7,7 @@ from django.utils import timezone
 from comments.service import CommentService
 from scheduled import rhythm
 from scheduled.models import ScheduledItem
+from scheduled.services.schedule_service import ScheduleService
 from todos.models import Todo
 from todos.services import TodoService
 
@@ -52,6 +53,9 @@ class ProductionService:
         claimed = ScheduledItem.objects.filter(pk=item.pk, last_produced_on=item.last_produced_on).update(last_produced_on=today)
         if not claimed:
             return None
+        if item.todo_id:  # a moved todo: the same one comes back, thread and all
+            ScheduleService.bring_back(item, "Back on today's list")
+            return item.todo
         todo = None
         if not TodoService.open_for(item.user).filter(scheduled_item=item).exists():
             todo = TodoService.produce(item.user, item.title, item, today)

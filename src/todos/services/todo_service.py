@@ -54,19 +54,20 @@ class TodoService:
         """The user's own order: their open tasks, and those done today — a done todo keeps its place,
         struck through, until the day is over."""
         done_today = Q(closed_at__gte=TodoService.start_of_today())
-        return (TodoService.live_queryset().filter(user=user, kind=Todo.Kind.TASK)
+        return (TodoService.live_queryset().filter(user=user, kind=Todo.Kind.TASK, moves__isnull=True)
                 .filter(Q(closed_at__isnull=True) | done_today))
 
     @staticmethod
     def listed_for(user) -> QuerySet:
         """Today's list: the user's tasks in their order (today's done ones still in place), then (if
-        the user shows them) today's meetings that haven't ended, by start time."""
+        the user shows them) today's meetings that haven't ended, by start time. A todo moved to a later
+        date isn't on it until that day."""
         now = timezone.localtime()
         midnight = TodoService.start_of_today()
         shown = Q(kind=Todo.Kind.TASK) & (Q(closed_at__isnull=True) | Q(closed_at__gte=midnight))
         if user.show_meetings:
             shown |= Q(kind=Todo.Kind.MEETING, closed_at__isnull=True, ends_at__gte=now, starts_at__lt=midnight + timedelta(days=1))
-        return (TodoService.live_queryset().filter(user=user).filter(shown).select_related("scheduled_item")
+        return (TodoService.live_queryset().filter(user=user, moves__isnull=True).filter(shown).select_related("scheduled_item")
                 .order_by(F("starts_at").asc(nulls_first=True), "position", "id"))
 
     @staticmethod
@@ -108,6 +109,15 @@ class TodoService:
         todo = Todo.objects.create(user=user, title=title, position=1, scheduled_item=scheduled_item, produced_on=day)
         TodoService._renumber(user)
         return todo
+
+    @staticmethod
+    @transaction.atomic
+    def bring_back(todo: Todo) -> None:
+        """A moved todo, back at the top of the list (its move has already gone)."""
+        TodoService.ordered_for(todo.user).exclude(pk=todo.pk).update(position=F("position") + 1)
+        todo.position = 1
+        todo.save(update_fields=["position", "updated_at"])
+        TodoService._renumber(todo.user)
 
     @staticmethod
     @transaction.atomic

@@ -7,7 +7,7 @@ from django.urls import reverse
 from accounts.services import IdentityService
 from comments.schemas import CommentCreateSchema
 from comments.service import CommentService
-from comments.templatetags.comment_tags import filesize
+from comments.templatetags.comment_tags import filesize, linkify
 from todos.schemas import TodoTitleSchema
 from todos.services import TodoService
 
@@ -36,3 +36,21 @@ class FilesizeTests(TestCase):
     def test_kilobytes_and_megabytes(self):
         self.assertEqual(filesize(500), "1 KB")
         self.assertEqual(filesize(1258291), "1.2 MB")
+
+
+class LinkifyTests(TestCase):
+    def test_a_link_in_an_update_opens_in_a_new_tab_without_its_scheme(self):
+        html = linkify("Spec at https://docs.example.com/plan/ please.")
+        self.assertIn('<a class="comment__link" href="https://docs.example.com/plan/" target="_blank" rel="noopener noreferrer">docs.example.com/plan', html)
+        self.assertTrue(html.endswith("</a> please."))  # the full stop stays the sentence's
+
+    def test_www_addresses_get_https_and_everything_else_stays_escaped(self):
+        html = linkify("<b>see</b> www.example.com")
+        self.assertIn("&lt;b&gt;see&lt;/b&gt;", html)
+        self.assertIn('href="https://www.example.com"', html)
+
+    def test_a_long_address_is_shortened_on_screen_but_not_in_the_link(self):
+        url = "https://example.com/" + "a" * 80
+        html = linkify(url)
+        self.assertIn(f'href="{url}"', html)
+        self.assertIn("…", html)

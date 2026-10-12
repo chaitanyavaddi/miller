@@ -9,7 +9,7 @@ from accounts.services import IdentityService
 from comments.models import Comment
 from scheduled import rhythm
 from scheduled.models import ScheduledItem
-from scheduled.services import ProductionService
+from scheduled.services import ProductionService, ScheduleService
 from todos.models import Todo
 from todos.schemas import TodoTitleSchema
 from todos.services import TodoService
@@ -207,3 +207,68 @@ class ScheduledModalTests(TestCase):
         page = self.client.get(reverse("board:index")).content.decode()
         self.assertIn('title="From Scheduled · every day"', page)
         self.assertIn('title="From Scheduled">', page)
+
+
+class MoveTests(TestCase):
+    """Move to…: the same todo leaves today until a date, then comes back with its thread."""
+
+    def setUp(self):
+        self.user = IdentityService.create_user("m@x.com", timezone="UTC")
+        self.client.force_login(self.user)
+        self.first = TodoService.create(self.user, TodoTitleSchema(title="Renew the domain"))
+        self.second = TodoService.create(self.user, TodoTitleSchema(title="Call the bank"))
+        self.thursday = timezone.localdate() + timedelta(days=3)
+
+    def move(self, day):
+        return self.client.post(reverse("scheduled:move", args=[self.first.id]), {"row_on_date": day.isoformat()})  # as the row's Save sends it
+
+    def notes(self, todo):
+        return list(todo.comments.filter(automatic=True).values_list("body", flat=True))
+
+    def test_the_modal_is_one_scheduled_row_with_a_date_and_save(self):
+        modal = self.client.get(reverse("scheduled:move", args=[self.first.id]))
+        self.assertContains(modal, "data-scheduled data-move")
+        self.assertContains(modal, 'value="Renew the domain"')
+        self.assertContains(modal, 'data-rhythm="once"')
+        self.assertContains(modal, 'data-panel="date"')
+        self.assertContains(modal, 'class="popover__day is-today" disabled')  # not today: that isn't a move
+
+    def test_a_moved_todo_leaves_today_and_its_thread_says_so(self):
+        response = self.move(self.thursday)
+        self.assertIn("overlay-close", response["HX-Trigger"])
+        listed = list(TodoService.listed_for(self.user).values_list("title", flat=True))
+        self.assertEqual(listed, ["Call the bank"])
+        self.second.refresh_from_db()
+        self.assertEqual(self.second.position, 1)  # the order closes up
+        self.assertEqual(self.notes(self.first), [f"Moved to {ScheduleService.short_date(self.thursday)}"])
+
+    def test_on_its_day_the_same_todo_comes_back_on_top(self):
+        self.move(self.thursday)
+        with patch("django.utils.timezone.localdate", return_value=self.thursday):
+            ProductionService.produce_due(self.user)
+        listed = list(TodoService.listed_for(self.user))
+        self.assertEqual([t.pk for t in listed], [self.first.pk, self.second.pk])
+        self.assertEqual(self.notes(self.first)[-1], "Back on today's list")
+        self.assertFalse(ScheduledItem.objects.exists())
+
+    def test_it_waits_in_the_scheduled_tab_where_only_its_date_changes(self):
+        self.move(self.thursday)
+        item = ScheduledItem.objects.get()
+        modal = self.client.get(reverse("scheduled:index"))
+        self.assertContains(modal, 'value="Renew the domain" maxlength="300" autocomplete="off" aria-label="Title" placeholder="Name it" readonly')
+        later = self.thursday + timedelta(days=2)
+        self.client.post(reverse("scheduled:save"), {"row_id": [item.id], "row_removed": [""], "row_title": ["Something else"], "row_rhythm": ["weekly"],
+                                                     "row_on_date": [later.isoformat()], "row_weekdays": ["1"], "row_month_day": [""]})
+        item.refresh_from_db()
+        self.assertEqual((item.on_date, item.rhythm, item.title), (later, "once", "Renew the domain"))
+
+    def test_removing_it_from_the_scheduled_tab_brings_it_back_now(self):
+        self.move(self.thursday)
+        item = ScheduledItem.objects.get()
+        self.client.post(reverse("scheduled:save"), {"row_id": [item.id], "row_removed": ["1"], "row_title": ["Renew the domain"], "row_rhythm": ["once"],
+                                                     "row_on_date": [self.thursday.isoformat()], "row_weekdays": [""], "row_month_day": [""]})
+        self.assertEqual(TodoService.listed_for(self.user).first().pk, self.first.pk)
+
+    def test_today_or_the_past_is_refused(self):
+        self.move(timezone.localdate())
+        self.assertFalse(ScheduledItem.objects.exists())

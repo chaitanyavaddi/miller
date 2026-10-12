@@ -58,6 +58,7 @@
       row.classList.toggle('is-changed', !gone && !!row.dataset.id && changed(row));
       if (gone || !row.dataset.id || changed(row)) pending++;
     });
+    if (root.matches('[data-move]')) return;  /* Move to…: one row, nothing to count */
     root.querySelector('[data-summary]').textContent =  /* empty until something changes */
       pending ? `${pending} unsaved change${pending === 1 ? '' : 's'}` : '';
     const any = !!root.querySelector('[data-row]:not(.is-removed)');
@@ -265,6 +266,7 @@
     open = null;
     root.querySelectorAll('[data-row]').forEach(row => { remember(row); render(row); });
     summarise();
+    if (root.matches('[data-move]')) openPanel(root.querySelector('[data-pop="date"]'));  /* Move to…: straight to the date */
   }
 
   document.addEventListener('htmx:after:swap', arm);

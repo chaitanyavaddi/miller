@@ -94,3 +94,23 @@ class ScheduledSaveSchema:
 
     def is_valid(self) -> bool:
         return all([self.is_valid_titles(), self.is_valid_rhythms(), self.is_valid_removals()])
+
+
+@dataclass
+class MoveSchema:
+    """Moving a todo to a later date: from tomorrow up to the furthest day a once item can be."""
+    on_date: date | None
+
+    @classmethod
+    def from_post(cls, request) -> "MoveSchema":
+        raw = request.POST.get("row_on_date") or request.POST.get("on_date") or ""  # the row's Save sends row_on_date
+        obj = cls(on_date=ScheduledSaveSchema._date(raw.strip()))
+        obj._request = request
+        return obj
+
+    def is_valid(self) -> bool:
+        today = timezone.localdate()
+        if self.on_date is None or not (today < self.on_date <= once_limit(today)):
+            messages.error(self._request, "Pick a day from tomorrow on.")
+            return False
+        return True

@@ -33,8 +33,24 @@
     if (overlay) overlay.replaceChildren();
   }
 
+  /* A todo's ⋯ menu: open beside its button; any click elsewhere, or a pick inside it, closes it. */
+  function toggleThreadMenu(button, open) {
+    const menu = button && document.getElementById(button.getAttribute('aria-controls'));
+    if (!menu) return;
+    const show = open ?? !menu.classList.contains('account-menu--open');
+    menu.classList.toggle('account-menu--open', show);
+    button.setAttribute('aria-expanded', String(show));
+  }
+
+  function closeThreadMenus() {
+    document.querySelectorAll('[data-action="thread-menu"][aria-expanded="true"]').forEach(b => toggleThreadMenu(b, false));
+  }
+
   document.addEventListener('click', e => {
     if (!e.target.closest('.topbar__actions')) toggleMenu(false);
+    const menuButton = e.target.closest('[data-action="thread-menu"]');
+    if (!menuButton || e.target.closest('.thread-menu .account-menu__action')) closeThreadMenus();
+    if (menuButton) { toggleThreadMenu(menuButton); return; }
     const action = e.target.closest('[data-action]');
     if (!action) return;
     if (action.dataset.action === 'menu-toggle') toggleMenu();
@@ -43,7 +59,7 @@
   });
 
   /* — toasts leave on their own after a few seconds, and wait while the pointer is on them — */
-  const TOAST_MS = 6000;
+  const TOAST_MS = 4000;
 
   function armToast(toast) {
     if (toast._init) return;
@@ -98,7 +114,8 @@
   document.addEventListener('keydown', e => {
     const overlay = document.getElementById('overlay');
     if (e.key !== 'Escape') return;
-    if (document.querySelector('.account-menu--open')) toggleMenu(false);
+    if (document.querySelector('[data-action="thread-menu"][aria-expanded="true"]')) closeThreadMenus();
+    else if (document.querySelector('.account-menu--open')) toggleMenu(false);
     else if (overlay && overlay.firstElementChild) closeOverlay();
   });
 })();

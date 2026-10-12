@@ -7,8 +7,10 @@ from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
+from comments.service import CommentService
 from scheduled import rhythm
 from scheduled.models import ScheduledItem
+from todos.services import TodoService
 
 Rhythm = ScheduledItem.Rhythm
 RHYTHM_WORDS = {Rhythm.ONCE: "once", Rhythm.WEEKLY: "weekly", Rhythm.MONTHLY: "monthly"}
@@ -43,6 +45,7 @@ class ScheduledRow:
     month_day: str = ""
     date_label: str = ""  # 17th October, 2026
     day_label: str = ""   # 1st
+    moved: bool = False   # an existing todo moved to a date: its title and rhythm are its own, only the date changes
 
 
 class ScheduleService:
@@ -51,14 +54,49 @@ class ScheduleService:
         return ScheduledItem.objects.filter(user=user)
 
     @staticmethod
+    def short_date(day: date) -> str:
+        return f"{day:%a}, {day:%b} {day.day}"
+
+    @staticmethod
+    @transaction.atomic
+    def move(todo, day: date) -> ScheduledItem:
+        """Take a todo off today's list until `day`, when the same todo comes back. Its thread says so."""
+        item, _ = ScheduledItem.objects.update_or_create(
+            todo=todo, defaults={"user": todo.user, "title": todo.title, "rhythm": Rhythm.ONCE, "on_date": day, "last_produced_on": None},
+        )
+        CommentService.note(todo, f"Moved to {ScheduleService.short_date(day)}")
+        TodoService._renumber(todo.user)
+        return item
+
+    @staticmethod
+    def bring_back(item: ScheduledItem, note: str) -> None:
+        """A moved todo, back on today's list now (its date came, or the user brought it back)."""
+        todo = item.todo
+        item.delete()
+        if todo.closed_at is None and todo.deleted_at is None:
+            TodoService.bring_back(todo)
+            CommentService.note(todo, note)
+
+    @staticmethod
     @transaction.atomic
     def save(user, changes) -> None:
-        """Apply everything the modal changed, at once: new items, edited ones, removed ones."""
+        """Apply everything the modal changed, at once: new items, edited ones, removed ones. A moved
+        todo only takes a new date; removing it brings it back to today."""
         for change in changes:
             if change.removed:
-                get_object_or_404(ScheduleService.items_for(user), pk=change.id).delete()
+                item = get_object_or_404(ScheduleService.items_for(user), pk=change.id)
+                if item.todo_id:
+                    ScheduleService.bring_back(item, "Back on today's list")
+                else:
+                    item.delete()
                 continue
             item = get_object_or_404(ScheduleService.items_for(user), pk=change.id) if change.id else ScheduledItem(user=user)
+            if item.todo_id:
+                if change.on_date and change.on_date != item.on_date:
+                    item.on_date = change.on_date
+                    item.save(update_fields=["on_date", "updated_at"])
+                    CommentService.note(item.todo, f"Moved to {ScheduleService.short_date(change.on_date)}")
+                continue
             item.title = change.title
             item.rhythm = change.rhythm
             item.on_date = change.on_date if change.rhythm == Rhythm.ONCE else item.on_date
@@ -85,6 +123,7 @@ class ScheduleService:
             on_date=item.on_date.isoformat() if item.on_date else "", weekdays=item.weekdays, month_day=str(item.month_day or ""),
             date_label=ScheduleService.date_label(item.on_date) if item.on_date else "",
             day_label=rhythm.ordinal(item.month_day) if item.month_day else "",
+            moved=item.todo_id is not None,
         )
 
     @staticmethod
@@ -110,6 +149,14 @@ class ScheduleService:
         if not any(m.shown for m in months):
             months[0] = CalendarMonth(months[0].title, months[0].lead, months[0].days, shown=True)
         return months
+
+    @staticmethod
+    def move_months(today: date) -> list[CalendarMonth]:
+        """The Scheduled calendar for Move to…: today can't be picked, only days after it."""
+        return [
+            CalendarMonth(m.title, m.lead, [Choice(d.value, d.label, enabled=d.enabled and not d.today, today=d.today) for d in m.days], m.shown)
+            for m in ScheduleService._months(ScheduledItem(rhythm=Rhythm.ONCE), today)
+        ]
 
     @staticmethod
     def modal(user) -> dict:

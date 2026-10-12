@@ -81,3 +81,13 @@
 .popover__nav:disabled { visibility: hidden; }
 .popover__note { padding-top: 6px; font-size: 11.5px; color: var(--text-4); }
 @media (prefers-reduced-motion: reduce) { .popover { animation: none; } }
+/* A moved todo's rhythm is always "once": shown, not picked. */
+.scheduled-chip:disabled { cursor: default; }
+.scheduled-chip:disabled .scheduled-chip__caret { display: none; }
+
+/* Move to…: one row of this modal, narrower, with "once" set and not shown, and nothing to remove. */
+.scheduled--move { max-width: 480px; }
+.scheduled--move [data-pop="rhythm"] { display: none; }
+.scheduled--move .todo-row__actions { visibility: hidden; }  /* no trash, but its space stays: the date sits where it does in the tab */
+.scheduled--move .scheduled-row__when { grid-template-columns: auto; }  /* the date alone, in one column at the right */
+.scheduled--move .scheduled-chip { white-space: nowrap; }
