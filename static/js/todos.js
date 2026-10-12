@@ -248,9 +248,10 @@
   refreshAtMidnight();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshIfNewDay(); });
 
-  /* — live meetings: a calendar push changes a meeting on the server within seconds; every minute (and
-   *   on coming back to the tab) the board asks for its meetings' stamp and reloads when it moved. Never
-   *   mid-typing, mid-drag or with a modal open: it just tries again next time. — */
+  /* — live meetings: the server says "meetings-changed" over the page's event stream the moment a calendar
+   *   push (or a meeting's end) changes them, and the board reloads. Never mid-typing, mid-drag or with a
+   *   modal open: it waits until that's over. As a net (the stream pauses while the tab is in the
+   *   background), the board also compares its meetings' stamp on coming back, and every few minutes. — */
   const stampUrl = document.getElementById('board-stamp')?.dataset.url;
   let meetingStamp = null;
 
@@ -264,14 +265,25 @@
     } catch (_) { return; }
     if (meetingStamp === null) { meetingStamp = stamp; return; }
     if (stamp === meetingStamp) return;
-    const busy = isTyping(document.activeElement) || document.querySelector('.todo-row--dragging') || document.getElementById('overlay')?.children.length;
-    if (busy) return;
+    if (busy()) return;
     meetingStamp = stamp;
     document.body.dispatchEvent(new Event('board-changed'));
   }
 
+  const busy = () => isTyping(document.activeElement) || document.querySelector('.todo-row--dragging') || document.getElementById('overlay')?.children.length;
+
+  let pendingLive = false;
+  function liveChanged() {
+    if (busy()) { pendingLive = true; return; }  /* refresh once whatever's going on is over */
+    pendingLive = false;
+    meetingStamp = null;  /* the next stamp check takes the new state as its starting point */
+    document.body.dispatchEvent(new Event('board-changed'));
+  }
+  document.addEventListener('meetings-changed', liveChanged, true);
+  setInterval(() => { if (pendingLive) liveChanged(); }, 1500);
+
   checkMeetings();
-  setInterval(checkMeetings, 60000);
+  setInterval(checkMeetings, 5 * 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) checkMeetings(); });
 
   /* — empty list: no message, just the composer, ready to type into. On load and whenever the

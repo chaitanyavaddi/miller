@@ -13,7 +13,7 @@ DATABASES = {"default": {
     "PASSWORD": env("DB_PASSWORD"),
     "HOST": env("DB_HOST"),
     "PORT": env("DB_PORT", "5432"),
-    "CONN_MAX_AGE": 60,
+    "CONN_MAX_AGE": 0,  # async server: requests run on different threads, so connections aren't kept between them
     "OPTIONS": {"sslmode": env("DB_SSLMODE", "require")},
 }}
 

@@ -11,11 +11,13 @@ if [ "$1" = "worker" ]; then
 fi
 python manage.py migrate --noinput
 python manage.py ensure_schedules
+# The web runs async (uvicorn workers), so pages can hold a live event stream open.
+WEB="gunicorn config.asgi:application -k uvicorn_worker.UvicornWorker --bind 0.0.0.0:8000 --workers ${WEB_CONCURRENCY:-2} --access-logfile -"
 if [ "${RUN_WORKER:-1}" = "0" ]; then
-  exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers "${WEB_CONCURRENCY:-2}" --access-logfile -
+  exec $WEB
 fi
 python manage.py qcluster &
-gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers "${WEB_CONCURRENCY:-2}" --access-logfile - &
+$WEB &
 trap 'kill -TERM $(jobs -p) 2>/dev/null' TERM INT  # a stop from the host stops both
 wait -n
 echo "A process stopped; exiting so the container restarts." >&2

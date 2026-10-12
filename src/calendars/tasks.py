@@ -27,8 +27,8 @@ def sync_source(source_id: int) -> bool:
 
 
 def sync_all() -> int:
-    """Hourly upkeep: renew push channels before they lapse, pick up a changed primary calendar, catch a
-    missed push. The pushes themselves are what keep meetings current."""
+    """Every ten minutes: catch a push that never came (re-reading each calendar), renew push channels
+    before they lapse, pick up a changed primary calendar. The pushes themselves keep meetings current."""
     synced = 0
     for connection in CalendarConnection.objects.filter(status=CalendarConnection.Status.CONNECTED).select_related("user"):
         try:

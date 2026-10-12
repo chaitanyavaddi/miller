@@ -55,9 +55,9 @@ class CalendarCallbackView(CalendarFlowMixin, View):
 
 @method_decorator(csrf_exempt, name="dispatch")
 class CalendarWebhookView(View):
-    """Push notifications that a calendar changed: a background job re-reads it (the database is current
-    within seconds, whether or not anyone has Miller open). Each push carries the secret its channel was
-    opened with, so anyone else's POST does nothing."""
+    """Push notifications that a calendar changed: it's re-read at once, so the database follows the
+    calendar within a second, whether or not anyone has Miller open, and open pages hear of it live.
+    Each push carries the secret its channel was opened with, so anyone else's POST does nothing."""
 
     def post(self, request, provider):
         if provider == CalendarConnection.Provider.GOOGLE:
@@ -93,8 +93,12 @@ class CalendarWebhookView(View):
         return self.sync(sources.values(), status=202)
 
     def sync(self, sources, status=200):
-        """Queue a re-read of each calendar and answer at once. A burst of pushes for one change (providers
-        send several) queues it once."""
+        """Re-read each calendar there and then (about half a second): the database, and the owner's open
+        pages, follow the calendar within a second of the push. If the provider stumbles, a background job
+        tries again, and the ten-minute sweep is the last net."""
         for source in sources:
-            CalendarService.queue_sync(source)
+            try:
+                CalendarService.sync_source(source)
+            except CalendarApiError:
+                CalendarService.queue_sync(source)
         return HttpResponse(status=status)

@@ -14,6 +14,7 @@ from calendars.models import CalendarConnection, CalendarEvent, CalendarSource
 from calendars.services.calendar_api import APIS, CalendarApiError, CalendarAuthError, MeetingFields, RemoteEvent
 from calendars.services.oauth_service import CalendarGrant, CalendarOAuthService
 from calendars.services.token_vault import TokenVault
+from live.bus import publish
 from todos.models import Todo
 from todos.services import TodoService
 
@@ -24,6 +25,7 @@ SYNC_LOOKAHEAD = timedelta(days=14)  # meetings are listed on their day; two wee
 RENEW_BEFORE = timedelta(days=1)     # push channels are renewed when they'd lapse within this
 ACCESS_TOKEN_TTL = 50 * 60           # both providers issue hour-long access tokens
 SYNC_DEBOUNCE = 10                   # seconds: pushes for one calendar within this queue one re-read
+MEETINGS_CHANGED = "meetings-changed"  # the live event an open board refreshes on
 
 
 class CalendarService:
@@ -119,43 +121,51 @@ class CalendarService:
                 for event in source.events.select_related("meeting"):
                     CalendarService._unlink(event)
                 source.delete()
+            publish(connection.user_id, MEETINGS_CHANGED)
         if primary is not None and not connection.sources.filter(external_id=primary.external_id).exists():
             CalendarSource.objects.create(connection=connection, external_id=primary.external_id, name=primary.name, is_primary=True, enabled=True)
 
     @staticmethod
-    def sync_source(source: CalendarSource, token: str | None = None) -> None:
+    def sync_source(source: CalendarSource, token: str | None = None) -> int:
         """Re-read the calendar's window and make the list match it: new and changed events are
-        applied, events no longer in it come off. Days are counted in the owner's zone, wherever this runs."""
+        applied, events no longer in it come off. Days are counted in the owner's zone, wherever this runs.
+        If anything changed, the owner's open pages hear of it at once. Returns how many meetings changed."""
         connection = source.connection
         token = token or CalendarService.access_token(connection)
         now = timezone.now()
         start, end = now - SYNC_LOOKBACK, now + SYNC_LOOKAHEAD
-        seen = set()
+        seen, changed = set(), 0
         with timezone.override(connection.user.tzinfo):
             for event in APIS[connection.provider].events(token, source.external_id, start, end):
-                CalendarService.apply(source, event)
+                changed += CalendarService.apply(source, event)
                 seen.add(event.external_id)
             gone = (source.events.filter(meeting__starts_at__gte=start, meeting__starts_at__lt=end)
                     .exclude(external_id__in=seen).select_related("meeting"))
             with transaction.atomic():
                 for event in gone:
                     CalendarService._unlink(event)
+                    changed += 1
+        if changed:
+            publish(connection.user_id, MEETINGS_CHANGED)
+        return changed
 
     @staticmethod
     @transaction.atomic
-    def apply(source: CalendarSource, event: RemoteEvent) -> None:
+    def apply(source: CalendarSource, event: RemoteEvent) -> bool:
+        """Bring one event in. True if a meeting was added, changed or taken off."""
         fields = event.fields
         linked = source.events.filter(external_id=event.external_id).select_related("meeting").first()
         if fields is None:
             if linked is not None:
                 CalendarService._unlink(linked)
-            return
+                return True
+            return False
         if linked is not None:
-            CalendarService._update(linked.meeting, fields)
-            return
+            return CalendarService._update(linked.meeting, fields)
         user = source.connection.user
         meeting = CalendarService._twin(user, fields) or CalendarService._create(user, fields)
         CalendarEvent.objects.create(source=source, meeting=meeting, external_id=event.external_id, ical_uid=fields.ical_uid)
+        return True
 
     @staticmethod
     def queue_sync(source: CalendarSource) -> bool:
@@ -244,14 +254,22 @@ class CalendarService:
         )
 
     @staticmethod
-    def _update(meeting: Todo, fields: MeetingFields) -> None:
-        meeting.title       = fields.title
-        meeting.starts_at   = fields.starts_at
-        meeting.ends_at     = fields.ends_at
-        meeting.meeting_url = fields.meeting_url
-        meeting.event_url   = fields.event_url
-        meeting.closed_at   = fields.ends_at if fields.ends_at < timezone.now() else None  # over, or moved later
-        meeting.save(update_fields=["title", "starts_at", "ends_at", "meeting_url", "event_url", "closed_at", "updated_at"])
+    def _update(meeting: Todo, fields: MeetingFields) -> bool:
+        """Saved only if something differs (a re-read of an unchanged calendar changes nothing). True if it did."""
+        values = {
+            "title": fields.title, "starts_at": fields.starts_at, "ends_at": fields.ends_at,
+            "meeting_url": fields.meeting_url, "event_url": fields.event_url,
+            "closed_at": fields.ends_at if fields.ends_at < timezone.now() else None,  # over, or moved later
+        }
+        if meeting.closed_at and values["closed_at"] and meeting.closed_at != values["closed_at"] and meeting.ends_at == fields.ends_at:
+            values["closed_at"] = meeting.closed_at  # closed when it ended; still the same end: leave it
+        changed = [name for name, value in values.items() if getattr(meeting, name) != value]
+        if not changed:
+            return False
+        for name in changed:
+            setattr(meeting, name, values[name])
+        meeting.save(update_fields=[*changed, "updated_at"])
+        return True
 
     @staticmethod
     def _unlink(event: CalendarEvent) -> None:

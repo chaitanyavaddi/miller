@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     "scheduled",
     "recordings",
     "jobs",
+    "live",
     "board",
     "django_q",
 ]

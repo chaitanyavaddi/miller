@@ -13,6 +13,7 @@
 <script src="{% static 'js/scheduled.js' %}" defer></script>
 <script src="{% static 'js/timeline.js' %}" defer></script>
 <script src="{% static 'js/recorder.js' %}" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@4.0.0/dist/ext/hx-sse.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -23,6 +24,7 @@
 <div id="overlay"{% if request.GET.settings %} hx-get="{% url 'board:settings' %}" hx-trigger="load" hx-swap="innerHTML"{% endif %}></div>
 <div class="notice" id="notice" role="status" aria-live="polite"></div>
 <div class="recorder" id="recorder" role="status" aria-live="polite" hidden></div>
+{% if not request.user.is_guest %}<div hidden id="live" hx-sse:connect="{% url 'live:events' %}"></div>{% endif %}{# the server tells this page when meetings change (todos.js) #}
 <span hidden id="board-stamp" data-url="{% url 'board:stamp' %}"></span>
 {% if not request.user.timezone %}<span hidden id="timezone-detect" data-url="{% url 'board:settings-timezone' %}"></span>{% endif %}
 {% endblock %}
