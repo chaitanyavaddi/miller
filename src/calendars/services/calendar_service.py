@@ -107,7 +107,7 @@ class CalendarService:
     def refresh_sources(connection: CalendarConnection, token: str) -> None:
         """Mirror the account's primary calendar (the only one Miller reads): it's on from the start,
         follows a rename, and if it ever changes, the old one goes with its meetings."""
-        primary = next((calendar for calendar in APIS[connection.provider].calendars(token) if calendar.is_primary), None)
+        primary = next((calendar for calendar in APIS[connection.provider].calendars(token, connection.email) if calendar.is_primary), None)
         for source in list(connection.sources.all()):
             if primary is not None and source.external_id == primary.external_id:
                 if source.name != primary.name or not source.enabled:

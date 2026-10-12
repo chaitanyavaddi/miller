@@ -11,7 +11,7 @@
     <p><b>Your account.</b> When you sign in with Google: your email address, name and profile picture. Before you sign in, a guest account tied to a cookie in your browser.</p>
     <p><b>What you write.</b> Your todos and their order, the updates in each thread, files you attach, scheduled todos and reminders.</p>
     <p><b>Your settings.</b> Your time zone, and whether meetings show in your list.</p>
-    <p><b>Calendar data, if you connect a calendar.</b> The names of the calendars in each account you connect. For the ones you switch on, the title, times, meeting link and ID of events from yesterday to two weeks ahead. A refresh token, encrypted, so Miller can keep reading them.</p>
+    <p><b>Calendar data, if you connect a calendar.</b> From each account's primary calendar: the title, times, meeting link and ID of events from yesterday to two weeks ahead. A refresh token, encrypted, so Miller can keep reading them.</p>
   </div>
 </section>
 
@@ -25,7 +25,7 @@
 <section class="legal__section">
   <h2>Google and Microsoft calendars</h2>
   <div class="legal__body">
-    <p>Miller reads your calendar only to list your meetings among your todos. It asks for permission to change events so that moving or adding meetings can come later without a reconnect; it doesn't change your events today.</p>
+    <p>Miller reads your calendar only to list your meetings among your todos. Its access to Google Calendar is read-only: it never changes, adds or deletes your events.</p>
     <p>Miller's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. Calendar data is never used to train AI models, never sold, and never shared except as needed to run Miller.</p>
   </div>
 </section>

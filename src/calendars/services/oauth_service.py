@@ -41,8 +41,9 @@ class AccessGrant:
 
 class CalendarOAuthService:
     """The consent screens for a calendar. Separate from sign-in: it asks for calendar access and an
-    offline refresh token, and may be for a different address than the one signed in. Write access is
-    asked for now so adding writes later needs no reconnect."""
+    offline refresh token, and may be for a different address than the one signed in. Google gets the
+    least it needs, reading events; write access, when a feature needs it, is asked for then and added to
+    the same grant (include_granted_scopes), with no reconnect."""
 
     @staticmethod
     def config(provider: str) -> ProviderConfig:
@@ -50,7 +51,7 @@ class CalendarOAuthService:
             return ProviderConfig(
                 auth_url="https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
                 token_url="https://login.microsoftonline.com/common/oauth2/v2.0/token",
-                scope="openid email profile offline_access https://graph.microsoft.com/Calendars.ReadWrite",
+                scope="openid email profile offline_access https://graph.microsoft.com/Calendars.Read",
                 required=(),
                 client_id=settings.MICROSOFT_CLIENT_ID,
                 client_secret=settings.MICROSOFT_CLIENT_SECRET,
@@ -59,8 +60,8 @@ class CalendarOAuthService:
         return ProviderConfig(
             auth_url="https://accounts.google.com/o/oauth2/v2/auth",
             token_url="https://oauth2.googleapis.com/token",
-            scope="openid email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly",
-            required=("https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.calendarlist.readonly"),
+            scope="openid email https://www.googleapis.com/auth/calendar.events.readonly",
+            required=("https://www.googleapis.com/auth/calendar.events.readonly",),
             client_id=settings.GOOGLE_CLIENT_ID,
             client_secret=settings.GOOGLE_CLIENT_SECRET,
             extra={"access_type": "offline", "prompt": "consent select_account", "include_granted_scopes": "true"},

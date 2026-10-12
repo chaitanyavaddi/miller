@@ -44,7 +44,7 @@ class FakeApi:
         self.events_by_calendar = events or {}
         self.watched, self.unwatched, self.revoked = [], [], []
 
-    def calendars(self, token):
+    def calendars(self, token, email):
         return self.calendars_list
 
     def events(self, token, calendar_id, start, end):
@@ -99,6 +99,12 @@ class EventParsingTests(TestCase):
     def test_a_meeting_link_is_found_in_the_description_when_there_is_no_conferencing(self):
         item = {**google_item("e", self.start), "hangoutLink": "", "description": "Join: https://acme.zoom.us/j/123?pwd=x thanks"}
         self.assertEqual(GoogleCalendarApi.fields(item).meeting_url, "https://acme.zoom.us/j/123?pwd=x")
+
+    @patch("calendars.services.calendar_api.call", return_value={"summary": "a@x.com", "items": []})
+    def test_googles_primary_calendar_is_read_by_the_accounts_address(self, call):
+        calendars = GoogleCalendarApi.calendars("token", "a@x.com")
+        self.assertEqual([(c.external_id, c.name, c.is_primary) for c in calendars], [("a@x.com", "a@x.com", True)])
+        self.assertIn("/calendars/a%40x.com/events", call.call_args.args[1])
 
     def test_an_outlook_event_reads_its_utc_times_subject_and_teams_link(self):
         item = {
@@ -307,8 +313,8 @@ class ConnectFlowTests(TestCase):
     def test_connect_sends_the_user_to_google_asking_for_calendar_access(self):
         response = self.client.get(reverse("calendars:connect", args=["google"]), {"hint": "a@x.com"})
         self.assertIn("accounts.google.com", response["Location"])
-        self.assertIn("calendar.events+", response["Location"].replace("%2F", "/").replace("%3A", ":"))
-        self.assertIn("calendar.calendarlist.readonly", response["Location"])
+        self.assertIn("calendar.events.readonly", response["Location"])
+        self.assertNotIn("calendarlist", response["Location"])  # reading events is all Miller asks for
         self.assertIn("login_hint=a%40x.com", response["Location"])
 
     @override_settings(CALENDAR_TOKEN_KEY="")

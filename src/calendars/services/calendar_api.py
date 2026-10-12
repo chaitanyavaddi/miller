@@ -22,8 +22,6 @@ GRAPH_SUBSCRIPTION_TTL = timedelta(minutes=4200)  # under Graph's limit for Outl
 MEETING_LINKS = [re.compile(r"https://[^\s<>\"')]*" + host + r"[^\s<>\"')]*") for host in (
     r"zoom\.us/", r"meet\.google\.com/", r"teams\.microsoft\.com/", r"teams\.live\.com/", r"webex\.com/", r"(?:gotomeeting\.com|meet\.goto\.com)/",
 )]
-# Google's read-only calendars of holidays, birthdays and the like: all-day noise, never offered.
-GOOGLE_NOISE = ("@group.v.calendar.google.com", "#contacts@")
 
 
 class CalendarApiError(Exception):
@@ -122,21 +120,11 @@ def meeting_fields(title: str, starts_at: datetime | None, ends_at: datetime | N
 
 class GoogleCalendarApi:
     @staticmethod
-    def calendars(token: str) -> list[RemoteCalendar]:
-        found, url = [], f"{GOOGLE_API}/users/me/calendarList?maxResults=250"
-        while url:
-            page = call("GET", url, token)
-            for item in page.get("items", []):
-                if any(mark in item["id"] for mark in GOOGLE_NOISE):
-                    continue
-                found.append(RemoteCalendar(
-                    external_id=item["id"],
-                    name=(item.get("summaryOverride") or item.get("summary") or item["id"])[:255],
-                    is_primary=bool(item.get("primary")),
-                ))
-            next_page = page.get("nextPageToken")
-            url = f"{GOOGLE_API}/users/me/calendarList?maxResults=250&pageToken={urllib.parse.quote(next_page)}" if next_page else ""
-        return found
+    def calendars(token: str, email: str) -> list[RemoteCalendar]:
+        """The account's primary calendar, the only one Miller reads. Its id is the account's address, and
+        the event list carries its name, so reading events is all the access this needs (no calendar list)."""
+        page = call("GET", f"{GOOGLE_API}/calendars/{urllib.parse.quote(email, safe='')}/events?maxResults=1", token)
+        return [RemoteCalendar(external_id=email, name=(page.get("summary") or email)[:255], is_primary=True)]
 
     @staticmethod
     def events(token: str, calendar_id: str, start: datetime, end: datetime) -> Iterator[RemoteEvent]:
@@ -195,7 +183,7 @@ class GoogleCalendarApi:
 
 class MicrosoftCalendarApi:
     @staticmethod
-    def calendars(token: str) -> list[RemoteCalendar]:
+    def calendars(token: str, email: str) -> list[RemoteCalendar]:
         found, url = [], f"{GRAPH_API}/me/calendars?$select=id,name,isDefaultCalendar&$top=100"
         while url:
             page = call("GET", url, token)
