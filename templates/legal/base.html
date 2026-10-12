@@ -14,7 +14,7 @@ hang in the margin like a todo's position, so every line starts on the logo's ed
   <main class="legal">
     <h1 class="home__title">{% block heading %}{% endblock %}<span class="home__title-more">{% block more %}{% endblock %}</span></h1>
     <div class="legal__sections">{% block sections %}{% endblock %}</div>
-    <p class="eyebrow legal__updated">Updated October 11, 2026</p>
+    <p class="eyebrow legal__updated">Updated {% block updated %}October 11, 2026{% endblock %}</p>
   </main>
 
   <c-site.footer />

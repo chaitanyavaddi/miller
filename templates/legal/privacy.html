@@ -3,52 +3,72 @@
 {% block title %}Privacy · Miller{% endblock %}
 {% block heading %}Privacy.{% endblock %}
 {% block more %}What Miller keeps, why, and how to remove it.{% endblock %}
+{% block updated %}October 12, 2026{% endblock %}
 
 {% block sections %}
 <section class="legal__section">
-  <h2>What Miller stores</h2>
+  <h2>What Miller collects</h2>
   <div class="legal__body">
     <p><b>Your account.</b> When you sign in with Google: your email address, name and profile picture. Before you sign in, a guest account tied to a cookie in your browser.</p>
-    <p><b>What you write.</b> Your todos and their order, the updates in each thread, files you attach, scheduled todos and reminders.</p>
-    <p><b>Your settings.</b> Your time zone, and whether meetings show in your list.</p>
-    <p><b>Calendar data, if you connect a calendar.</b> From each account's primary calendar: the title, times, meeting link and ID of events from yesterday to two weeks ahead. A refresh token, encrypted, so Miller can keep reading them.</p>
+    <p><b>What you write.</b> Your todos and their order, the updates in each thread, scheduled todos, and your settings, such as your time zone.</p>
+    <p><b>Your calendar, if you connect one.</b> From each connected account's primary Google Calendar: each event's title, start and end time, meeting link, link to the event, ID, status and your response, for events from yesterday to two weeks ahead.</p>
+    <p><b>Voice notes, if you use the mic.</b> The audio of what you say into a todo's composer, for up to a minute. It's turned into text for you to edit and send. Miller doesn't keep the audio.</p>
+    <p><b>Call recordings, if you start one.</b> While a meeting is on and you choose to record it: your microphone, and the call's audio if you share its tab. The audio is kept only until it's transcribed, then deleted. The transcript is kept with the meeting.</p>
   </div>
 </section>
 
 <section class="legal__section">
-  <h2>What Miller does with it</h2>
+  <h2>How Miller uses it</h2>
   <div class="legal__body">
-    <p>Only what the product needs: showing your list, your threads and today's meetings to you, and sending the reminders you set. Your data isn't sold, used for advertising, or shown to anyone else. Miller runs no analytics or tracking scripts.</p>
+    <p>Only to provide Miller to you: showing your list, your threads and today's meetings, turning your voice notes into text, and transcribing the calls you record. Your data isn't sold, used for advertising, or shown to anyone else. Miller runs no analytics or tracking scripts.</p>
   </div>
 </section>
 
 <section class="legal__section">
-  <h2>Google and Microsoft calendars</h2>
+  <h2>Google user data</h2>
   <div class="legal__body">
-    <p>Miller reads your calendar only to list your meetings among your todos. Its access to Google Calendar is read-only: it never changes, adds or deletes your events.</p>
-    <p>Miller's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. Calendar data is never used to train AI models, never sold, and never shared except as needed to run Miller.</p>
+    <p><b>What Miller accesses.</b> With your permission, Miller reads events from your primary Google Calendar using the read-only scope calendar.events.readonly. It never creates, changes or deletes your events. At sign-in it receives your email address, name and profile picture.</p>
+    <p><b>How it's used.</b> Only to list your meetings among your todos: the meeting's name and time, a link to join it, a link to open it in Google Calendar, and its ID so that changes and cancellations update the right meeting. Miller hides cancelled events and events you declined.</p>
+    <p><b>Who it's shared with.</b> No one. Google user data stays in Miller. It isn't sold, isn't shared with or transferred to third parties, and isn't sent to the transcription service described below.</p>
+    <p><b>How it's protected.</b> It's sent over HTTPS. The token that lets Miller read your calendar is encrypted at rest, and only you can see your meetings in Miller.</p>
+    <p><b>How long it's kept.</b> Upcoming events are kept up to date as your calendar changes. Meetings you've had stay in your list of past todos until you disconnect the calendar or delete your account. Disconnecting revokes Miller's access and deletes those meetings from Miller.</p>
+    <p><b>Limited Use.</b> Miller's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements. Google user data is never used for advertising, never sold to data brokers or anyone else, and never used to decide credit or lending. Google Workspace APIs are not used to develop, improve, or train non-personalized AI and/or ML models.</p>
+  </div>
+</section>
+
+<section class="legal__section">
+  <h2>Who else processes data</h2>
+  <div class="legal__body">
+    <p><b>Google</b>, for signing in and, if you connect it, reading your calendar.</p>
+    <p><b>Groq</b>, to turn audio into text. Voice notes and call recordings you make are sent to Groq for transcription, and nothing else. No Google user data is sent to Groq.</p>
+  </div>
+</section>
+
+<section class="legal__section">
+  <h2>Recording other people</h2>
+  <div class="legal__body">
+    <p>A call is recorded only when you start it, and only while its meeting is on. Recording a conversation can require everyone's consent where you or they are. Tell the people on the call before you record.</p>
   </div>
 </section>
 
 <section class="legal__section">
   <h2>Cookies</h2>
   <div class="legal__body">
-    <p>One cookie keeps you signed in, or remembers your guest list. One protects forms. No advertising or tracking cookies.</p>
+    <p>One cookie keeps you signed in, or remembers your guest list. One protects forms. A draft you haven't sent is kept in your browser's own storage. No advertising or tracking cookies.</p>
   </div>
 </section>
 
 <section class="legal__section">
-  <h2>Where it's kept</h2>
+  <h2>Where it's kept, and for how long</h2>
   <div class="legal__body">
-    <p>On Miller's own servers, sent over HTTPS. Calendar refresh tokens are encrypted at rest.</p>
+    <p>On Miller's own servers, sent over HTTPS. Miller keeps your data for as long as you use it. Audio is deleted once it's transcribed. Guest accounts that never added a todo are deleted after a week.</p>
   </div>
 </section>
 
 <section class="legal__section">
   <h2>Removing it</h2>
   <div class="legal__body">
-    <p><b>A calendar.</b> Settings, then Disconnect. Its meetings leave your list, Miller stops reading it, and its token is deleted (for Google, also revoked). You can also remove Miller from your Google or Microsoft account settings at any time.</p>
-    <p><b>A guest list.</b> Guest accounts that never added a todo are deleted after a week.</p>
+    <p><b>A calendar.</b> Settings, then Calendars, then ✕. Its meetings leave Miller, Miller stops reading it, and its access is revoked. You can also remove Miller from your Google Account's third-party access at any time.</p>
     <p><b>Your account.</b> Email <a href="mailto:hello@miller.so">hello@miller.so</a> from the address you sign in with. Everything is deleted within 30 days.</p>
   </div>
 </section>

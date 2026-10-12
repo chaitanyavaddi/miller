@@ -68,6 +68,9 @@ a.text-btn { display: inline-block; }
 .account-menu__detail { font-size: 12px; color: var(--text-4); overflow-wrap: anywhere; }
 .account-menu__action { padding: 6px 0 0; color: var(--text); }
 .account-menu__section:last-child .account-menu__action:only-child { padding: 0; }
+.account-menu__legal { flex-direction: row; align-items: center; gap: 8px; padding-top: 10px; padding-bottom: 10px; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-4); }
+.account-menu__legal a { color: var(--text-4); text-decoration: none; }
+.account-menu__legal a:hover { color: var(--text); text-decoration: underline dotted; text-underline-offset: 3px; }
 
 .shortcuts { display: grid; grid-template-columns: auto 1fr; column-gap: 14px; row-gap: 8px; margin: 0; width: 100%; align-items: baseline; }
 .shortcuts__keys { display: flex; gap: 3px; margin: 0; }

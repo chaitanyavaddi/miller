@@ -21,6 +21,9 @@
         <c-ui.text-button class="account-menu__action" hx-post="{% url 'accounts:logout' %}" hx-swap="none">Log out</c-ui.text-button>
         {% endif %}
       </div>
+      <div class="account-menu__section account-menu__legal">
+        <a href="{% url 'privacy' %}" target="_blank" rel="noopener">Privacy</a><span aria-hidden="true">·</span><a href="{% url 'terms' %}" target="_blank" rel="noopener">Terms</a>
+      </div>
     </div>
   </div>
 </header>

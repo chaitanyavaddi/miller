@@ -430,8 +430,16 @@ class LegalPageTests(TestCase):
         self.assertContains(response, f'href="{reverse("privacy")}"')
         self.assertContains(response, f'href="{reverse("terms")}"')
 
-    def test_privacy_states_the_google_limited_use_commitment(self):
-        self.assertContains(self.client.get(reverse("privacy")), "including the Limited Use requirements")
+    def test_privacy_states_the_google_limited_use_and_ai_commitments(self):
+        page = self.client.get(reverse("privacy"))
+        self.assertContains(page, "including the Limited Use requirements")
+        self.assertContains(page, "Google Workspace APIs are not used to develop, improve, or train non-personalized AI and/or ML models.")
+        self.assertContains(page, "calendar.events.readonly")
+
+    def test_the_app_links_to_privacy_and_terms_from_the_account_menu(self):
+        page = self.client.get(reverse("board:index"))
+        self.assertContains(page, f'href="{reverse("privacy")}" target="_blank"')
+        self.assertContains(page, f'href="{reverse("terms")}" target="_blank"')
 
     def test_terms_are_public(self):
         self.assertEqual(self.client.get(reverse("terms")).status_code, 200)
