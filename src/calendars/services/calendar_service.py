@@ -34,14 +34,6 @@ class CalendarService:
     def can_connect(provider: str) -> bool:
         return TokenVault.is_configured() and CalendarOAuthService.is_configured(provider)
 
-    @staticmethod
-    def suggested_email(user) -> str:
-        """The signed-in address, offered first while its Google calendar isn't connected yet."""
-        if user.is_guest:
-            return ""
-        connected = CalendarService.connections_for(user).filter(provider=CalendarConnection.Provider.GOOGLE, email=user.email)
-        return "" if connected.exists() else user.email
-
     # Connecting
 
     @staticmethod
@@ -78,23 +70,6 @@ class CalendarService:
             connection.delete()
         cache.delete(CalendarService._token_key(connection))
 
-    @staticmethod
-    def set_enabled(source: CalendarSource, enabled: bool) -> None:
-        """Switch one calendar of an account on (watch it and pull its meetings in) or off."""
-        if source.enabled == enabled:
-            return
-        source.enabled = enabled
-        source.save(update_fields=["enabled", "updated_at"])
-        token = CalendarService.access_token(source.connection)
-        if enabled:
-            CalendarService._ensure_channel(token, source)
-            CalendarService.sync_source(source, token)
-            return
-        CalendarService._unwatch(token, source)
-        with transaction.atomic():
-            for event in source.events.select_related("meeting"):
-                CalendarService._unlink(event)
-
     # Syncing
 
     @staticmethod
@@ -130,25 +105,21 @@ class CalendarService:
 
     @staticmethod
     def refresh_sources(connection: CalendarConnection, token: str) -> None:
-        """Mirror the account's calendars: new ones arrive switched off (except the primary one on
-        first connect), renamed ones follow, removed ones go with their meetings."""
-        remote = {calendar.external_id: calendar for calendar in APIS[connection.provider].calendars(token)}
-        first_time = not connection.sources.exists()
+        """Mirror the account's primary calendar (the only one Miller reads): it's on from the start,
+        follows a rename, and if it ever changes, the old one goes with its meetings."""
+        primary = next((calendar for calendar in APIS[connection.provider].calendars(token) if calendar.is_primary), None)
         for source in list(connection.sources.all()):
-            calendar = remote.pop(source.external_id, None)
-            if calendar is None:
-                with transaction.atomic():
-                    for event in source.events.select_related("meeting"):
-                        CalendarService._unlink(event)
-                    source.delete()
-            elif (source.name, source.is_primary) != (calendar.name, calendar.is_primary):
-                source.name, source.is_primary = calendar.name, calendar.is_primary
-                source.save(update_fields=["name", "is_primary", "updated_at"])
-        for calendar in remote.values():
-            CalendarSource.objects.create(
-                connection=connection, external_id=calendar.external_id, name=calendar.name,
-                is_primary=calendar.is_primary, enabled=first_time and calendar.is_primary,
-            )
+            if primary is not None and source.external_id == primary.external_id:
+                if source.name != primary.name or not source.enabled:
+                    source.name, source.is_primary, source.enabled = primary.name, True, True
+                    source.save(update_fields=["name", "is_primary", "enabled", "updated_at"])
+                continue
+            with transaction.atomic():
+                for event in source.events.select_related("meeting"):
+                    CalendarService._unlink(event)
+                source.delete()
+        if primary is not None and not connection.sources.filter(external_id=primary.external_id).exists():
+            CalendarSource.objects.create(connection=connection, external_id=primary.external_id, name=primary.name, is_primary=True, enabled=True)
 
     @staticmethod
     def sync_source(source: CalendarSource, token: str | None = None) -> None:

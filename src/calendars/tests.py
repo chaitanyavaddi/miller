@@ -137,7 +137,8 @@ class MeetingSyncTests(CalendarTestCase):
         self.assertEqual(self.meetings(), [])
 
     def test_the_same_meeting_in_two_calendars_is_listed_once(self):
-        other = CalendarSource.objects.create(connection=self.connection, external_id="team", name="Team", enabled=True)
+        account = CalendarConnection.objects.create(user=self.user, provider="google", email="b@x.com", refresh_token="x")
+        other = CalendarSource.objects.create(connection=account, external_id="b-primary", name="b@x.com", is_primary=True, enabled=True)
         CalendarService.apply(self.source, remote("e1", self.start))
         CalendarService.apply(other, RemoteEvent("e2", GoogleCalendarApi.fields({**google_item("e2", self.start), "iCalUID": "uid-e1"})))
         self.assertEqual(self.meetings(), ["Design sync"])
@@ -153,7 +154,7 @@ class MeetingSyncTests(CalendarTestCase):
             CalendarService.sync_source(self.source)
         self.assertEqual(self.meetings(), ["Retro"])
 
-    def test_the_account_sync_reads_only_enabled_calendars(self):
+    def test_only_the_primary_calendar_is_read(self):
         api = FakeApi(
             calendars=[RemoteCalendar("primary-id", "Work", True), RemoteCalendar("family", "Family", False)],
             events={"primary-id": [remote("e1", self.start)], "family": [remote("f1", self.start, title="Dentist")]},
@@ -161,7 +162,7 @@ class MeetingSyncTests(CalendarTestCase):
         with patch.dict(GOOGLE, {"google": api}):
             CalendarService.sync(self.connection)
         self.assertEqual(self.meetings(), ["Design sync"])
-        self.assertFalse(CalendarSource.objects.get(external_id="family").enabled)  # a calendar found later arrives off
+        self.assertFalse(CalendarSource.objects.filter(external_id="family").exists())  # secondary calendars are never added
         self.connection.refresh_from_db()
         self.assertIsNotNone(self.connection.synced_at)
 
@@ -170,15 +171,6 @@ class MeetingSyncTests(CalendarTestCase):
         with patch.dict(GOOGLE, {"google": FakeApi(calendars=[RemoteCalendar("other", "Other", True)])}):
             CalendarService.refresh_sources(self.connection, "access")
         self.assertEqual((self.meetings(), list(self.connection.sources.values_list("name", flat=True))), ([], ["Other"]))
-
-    def test_switching_a_calendar_on_pulls_its_meetings_in_and_off_takes_them_out(self):
-        family = CalendarSource.objects.create(connection=self.connection, external_id="family", name="Family")
-        api = FakeApi(events={"family": [remote("f1", self.start, title="Dentist")]})
-        with patch.dict(GOOGLE, {"google": api}):
-            CalendarService.set_enabled(family, True)
-            self.assertEqual(self.meetings(), ["Dentist"])
-            CalendarService.set_enabled(family, False)
-        self.assertEqual(self.meetings(), [])
 
     def test_disconnecting_stops_channels_revokes_and_takes_meetings_off(self):
         self.source.channel_id, self.source.channel_resource = "ch-1", "res-1"

@@ -10,7 +10,7 @@ OFFERED_PROVIDERS = (CalendarConnection.Provider.GOOGLE,)
 
 
 class SettingsService:
-    """Read model for the settings modal: the user's zone, and their calendars once meetings are on."""
+    """Read model for the settings modal: the user's zone and their connected calendars."""
 
     @staticmethod
     def build(user, notice: str = "") -> dict:
@@ -23,7 +23,6 @@ class SettingsService:
             "zones":        zone_names(),
             "current_zone": user.timezone or settings.TIME_ZONE,
             "connections":  list(CalendarService.connections_for(user)),
-            "suggested":    CalendarService.suggested_email(user) if CalendarService.can_connect(CalendarConnection.Provider.GOOGLE) else "",
             "providers":    providers,
             "notice":       notice,
         }

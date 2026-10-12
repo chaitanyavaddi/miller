@@ -27,48 +27,62 @@
 .thread__join { margin-left: auto; margin-right: 12px; }
 
 /* — settings modal: a narrow column of plain sections, like the rest of the board — */
-/* — settings: All todos' frame (720 wide, fixed height, label + ✕ on top), then numbered sections
-     that fold. The number hangs in the margin (44px + 14px, a todo row's position column), so
-     headings and rows share one left edge. Each row: what it is on the left, its control on the
-     right, a hairline between rows. — */
-.settings { position: relative; max-width: 720px; width: 100%; height: min(680px, calc(100vh - 96px)); display: flex; flex-direction: column; background: var(--bg); padding: 8px 0; }
-.settings__body { margin-top: 24px; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 12px 0 58px; margin-left: -58px; counter-reset: settings;
+/* — settings: All todos' frame, narrower (640 wide, fixed height, label + ✕ on top), then numbered sections
+     that fold, headed like the list's own labels. The number starts on the frame's edge, under
+     "Settings", in a todo row's position column (44px + 14px); a section's rows start where its name
+     does. Each row names a setting and says what it does on the left; its value and controls sit on
+     the right. Space separates, not lines. — */
+.settings { position: relative; max-width: 640px; width: 100%; height: min(680px, calc(100vh - 96px)); display: flex; flex-direction: column; background: var(--bg); padding: 8px 0; }
+.settings__body { margin-top: 24px; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 12px; counter-reset: settings;
   scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-.settings__notice { margin-bottom: 16px; font-size: 13px; line-height: 20px; color: var(--text); }
+.settings__notice { margin: 0 0 16px 58px; font-size: 13px; line-height: 20px; color: var(--text); }
 
-.settings__group { counter-increment: settings; border-bottom: 1px solid var(--border); }
-.settings__summary { display: flex; align-items: center; height: 56px; cursor: pointer; list-style: none; }
+.settings__group { counter-increment: settings; }
+.settings__group + .settings__group { margin-top: 16px; }
+.settings__summary { display: flex; align-items: center; height: 36px; cursor: pointer; list-style: none; }
 .settings__summary::-webkit-details-marker { display: none; }
-.settings__heading { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-3); }
-.settings__heading::before { content: counter(settings, decimal-leading-zero); display: inline-block; width: 58px; margin-left: -58px; vertical-align: baseline;
-  font-family: var(--font-mono); font-size: 10.5px; line-height: 1; font-weight: 400; letter-spacing: 0; color: var(--text-4); }
-.settings__group[open] .settings__heading, .settings__summary:hover .settings__heading { color: var(--text); }
+.settings__heading { margin: 0; line-height: 20px; font-weight: 400; }
+.settings__heading::before { content: counter(settings, decimal-leading-zero); display: inline-block; width: 58px; }
+.settings__summary:hover .settings__heading, .settings__group[open] .settings__heading { color: var(--text-3); }
 .settings__chevron { margin-left: auto; color: var(--text-4); transition: transform 0.15s ease; }
 .settings__group[open] .settings__chevron { transform: rotate(180deg); }
 .settings__summary:hover .settings__chevron { color: var(--text); }
 .settings__group[open] { padding-bottom: 8px; }
 
-.settings__row { display: flex; align-items: center; gap: 32px; min-height: 64px; padding: 14px 0; border-top: 1px solid var(--border); }
-.settings__about { flex: 0 1 340px; min-width: 0; }  /* a narrow left column: the right side holds only controls */
-.settings__label { font-size: 13.5px; line-height: 20px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings__row { display: flex; align-items: center; gap: 32px; padding: 12px 0 12px 58px; }
+.settings__row--top { align-items: flex-start; }
+.settings__about { flex: 1 1 0; max-width: 220px; min-width: 0; }  /* names and explains; the right side holds only values */
+.settings__label { font-size: 13.5px; line-height: 20px; color: var(--text); }
 .settings__hint { margin-top: 2px; font-size: 12.5px; line-height: 18px; color: var(--text-4); }
 .settings__control { flex: none; margin-left: auto; display: flex; align-items: center; gap: 16px; }
-.settings__control > .text-btn { display: inline-flex; align-items: center; height: 20px; }
+.settings__control--stack { flex: 0 0 320px; min-width: 0; flex-direction: column; align-items: stretch; gap: 8px; }
 .settings__select { appearance: none; -webkit-appearance: none; height: 20px; margin: 0; font: inherit; font-size: 13.5px; color: var(--text); background: transparent; border: none;
   padding: 0; text-align: right; text-align-last: right; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 4px; }
-.settings__check { margin: 0; width: 14px; height: 14px; accent-color: var(--text); cursor: pointer; }
+.settings__add { align-self: flex-end; margin-top: 4px; }
+.settings__add:first-child { margin-top: 0; }  /* alone in the column (a guest): level with the label */
 
-/* A connected account's calendars and the shortcuts are lighter rows: no hint, a shorter line. */
-.settings__row--calendar { border-top-style: dotted; }  /* belongs to the account above it */
-.settings__row--calendar .settings__label { color: var(--text-3); }
-.settings__row--key { min-height: 44px; padding: 12px 0; }
-.settings__keys { display: flex; gap: 6px; flex: none; }
+/* A connected calendar: a wide pill with the provider's mark, the account, its state and two quiet actions. */
+.calendar-pill { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 6px 0 14px; border: 1px solid var(--border); border-radius: 8px; }
+.calendar-pill__mark { flex: none; }
+.calendar-pill__email { flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-pill__state { flex: none; display: inline-flex; align-items: center; height: 20px; font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }
+.calendar-pill__open, .calendar-pill__remove { flex: none; color: var(--text-4); }
+.calendar-pill__open:hover, .calendar-pill__remove:hover { color: var(--text); }
+.calendar-pill--lost .calendar-pill__email { color: var(--text-4); }
+.calendar-pill__reconnect { flex: none; display: inline-flex; align-items: center; height: 20px; color: var(--text); }
+
+.settings__row--key { padding: 8px 0 8px 58px; }
+.settings__row--key .settings__label { color: var(--text-3); }  /* a reference list, quieter than settings */
+.settings__keys { display: flex; gap: 6px; flex: none; margin-left: auto; }
 .settings__keys kbd { min-width: 16px; text-align: center; font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
 
 @media (max-width: 760px) {
-  .settings__body { padding-left: 32px; margin-left: -32px; }
-  .settings__heading::before { width: 32px; margin-left: -32px; }
-  .settings__row { gap: 16px; }
+  .settings__heading::before { width: 32px; }
+  .settings__notice { margin-left: 32px; }
+  .settings__row { padding-left: 32px; }
+  .settings__row--key { padding-left: 32px; }
+  .settings__row { flex-wrap: wrap; gap: 12px; }
+  .settings__control--stack { flex-basis: 100%; }
 }
 
 /* — Timeline: one modal, two tabs — Past (every todo, the most recently closed first)

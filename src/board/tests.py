@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.services import GuestService, IdentityService, PreferenceService
-from calendars.models import CalendarConnection, CalendarSource
+from calendars.models import CalendarConnection
 from calendars.services import CalendarApiError, CalendarService, TokenVault
 from comments.models import Comment
 from todos.models import Todo
@@ -308,15 +308,6 @@ class SettingsTests(TestCase):
     def test_the_account_menu_opens_settings(self):
         self.assertContains(self.client.get(reverse("board:index")), f'hx-get="{reverse("board:settings")}"')
 
-    def test_the_signed_in_google_calendar_is_suggested_first(self):
-        response = self.client.get(reverse("board:settings"))
-        self.assertContains(response, "The Google account you signed in with.")
-        self.assertContains(response, "hint=s%40x.com")
-
-    def test_turning_meetings_on_refreshes_the_board(self):
-        response = self.client.post(reverse("board:settings-meetings"), {"show_meetings": "1"})
-        self.assertIn("board-changed", response["HX-Trigger"])
-
     @override_settings(MICROSOFT_CLIENT_ID="id", MICROSOFT_CLIENT_SECRET="secret")
     def test_only_google_is_offered_for_now(self):
         response = self.client.get(reverse("board:settings"))
@@ -347,7 +338,7 @@ class SettingsTests(TestCase):
     def test_guests_are_asked_to_sign_in_for_calendars(self):
         self.client.force_login(GuestService.create_guest())
         response = self.client.get(reverse("board:settings"))
-        self.assertContains(response, "Sign in to bring meetings")
+        self.assertContains(response, "Sign in to connect")
         self.assertNotContains(response, 'name="show_meetings"')
 
     @patch.object(CalendarService, "access_token", side_effect=CalendarApiError("down"))
@@ -358,14 +349,13 @@ class SettingsTests(TestCase):
         self.assertContains(response, "Disconnected s@x.com.")
         self.assertFalse(CalendarConnection.objects.exists())
 
-    def test_an_account_with_several_calendars_lists_each_with_a_switch(self):
-        PreferenceService.set_show_meetings(self.user, True)
-        connection = CalendarConnection.objects.create(user=self.user, provider="google", email="s@x.com", refresh_token=TokenVault.seal("r"))
-        CalendarSource.objects.create(connection=connection, external_id="p", name="Sam", is_primary=True, enabled=True)
-        family = CalendarSource.objects.create(connection=connection, external_id="f", name="Family")
+    def test_each_connected_calendar_shows_as_a_pill_with_a_link_out(self):
+        CalendarConnection.objects.create(user=self.user, provider="google", email="work@x.com", refresh_token="x")
         response = self.client.get(reverse("board:settings"))
-        self.assertContains(response, "Family")
-        self.assertContains(response, reverse("board:settings-source", args=[family.id]))
+        self.assertContains(response, 'class="calendar-pill__email" title="work@x.com"')
+        self.assertContains(response, "https://calendar.google.com/calendar/u/0/r?authuser=work%40x.com")
+        self.assertContains(response, "+ Add calendar")
+        self.assertNotContains(response, 'name="show_meetings"')  # connecting is what brings meetings in
 
     def test_an_account_that_lost_access_offers_a_reconnect(self):
         PreferenceService.set_show_meetings(self.user, True)
@@ -374,11 +364,11 @@ class SettingsTests(TestCase):
         self.assertContains(response, "Lost access")
         self.assertContains(response, reverse("calendars:connect", args=["google"]) + "?hint=s%40x.com")
 
-    def test_someone_elses_calendar_cant_be_switched(self):
+    def test_someone_elses_calendar_cant_be_disconnected(self):
         other = IdentityService.create_user("o@x.com")
         connection = CalendarConnection.objects.create(user=other, provider="google", email="o@x.com", refresh_token="x")
-        source = CalendarSource.objects.create(connection=connection, external_id="p", name="Theirs")
-        self.assertEqual(self.client.post(reverse("board:settings-source", args=[source.id]), {"enabled": "1"}).status_code, 403)
+        self.assertEqual(self.client.post(reverse("board:settings-disconnect", args=[connection.id])).status_code, 403)
+        self.assertTrue(CalendarConnection.objects.filter(pk=connection.pk).exists())
 
 
 class RowAgeTests(TestCase):

@@ -10,8 +10,6 @@ from board.views import (
     ReviewThreadView,
     ReviewView,
     SettingsCalendarDisconnectView,
-    SettingsCalendarSourceView,
-    SettingsMeetingsView,
     SettingsTimezoneView,
     SettingsView,
     TodoCloseView,
@@ -45,7 +43,5 @@ urlpatterns = [
     path("review/<int:pk>/delete/",   ReviewDeleteView.as_view(),  name="review-delete"),
     path("settings/",                 SettingsView.as_view(),      name="settings"),
     path("settings/timezone/",        SettingsTimezoneView.as_view(), name="settings-timezone"),
-    path("settings/meetings/",        SettingsMeetingsView.as_view(), name="settings-meetings"),
     path("settings/calendars/<int:pk>/disconnect/", SettingsCalendarDisconnectView.as_view(), name="settings-disconnect"),
-    path("settings/calendars/sources/<int:pk>/",    SettingsCalendarSourceView.as_view(),     name="settings-source"),
 ]

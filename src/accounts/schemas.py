@@ -35,17 +35,3 @@ class TimezoneSchema:
 
     def is_valid(self) -> bool:
         return all([self.is_valid_timezone()])
-
-
-@dataclass
-class MeetingsToggleSchema:
-    show_meetings: bool
-
-    @classmethod
-    def from_post(cls, request) -> "MeetingsToggleSchema":
-        obj = cls(show_meetings=request.POST.get("show_meetings") == "1")
-        obj._request = request
-        return obj
-
-    def is_valid(self) -> bool:
-        return True

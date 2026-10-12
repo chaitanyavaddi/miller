@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 from django.conf import settings
 from django.db import models
 
@@ -30,10 +32,16 @@ class CalendarConnection(models.Model):
     def __str__(self):
         return f"{self.email} ({self.get_provider_display()})"
 
+    @property
+    def calendar_url(self) -> str:
+        """The account's calendar in the provider's web app, opened as that account."""
+        if self.provider == self.Provider.MICROSOFT:
+            return "https://outlook.office.com/calendar/"
+        return f"https://calendar.google.com/calendar/u/0/r?authuser={quote(self.email)}"
+
 
 class CalendarSource(models.Model):
-    """One calendar inside a connected account: the primary one, or a secondary/shared one the user
-    switched on. Each enabled source has a push channel (a Google watch channel or a Graph
+    """The calendar Miller reads in a connected account: its primary one. It has a push channel (a Google watch channel or a Graph
     subscription) that tells us when its events change."""
     connection         = models.ForeignKey(CalendarConnection, on_delete=models.CASCADE, related_name="sources")
     external_id        = models.CharField(max_length=1024)

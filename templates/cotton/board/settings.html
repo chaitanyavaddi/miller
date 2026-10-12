@@ -1,6 +1,7 @@
-<c-vars user zones current_zone connections suggested providers notice="" />
-{% comment %}Settings, in All todos' frame: numbered sections that fold, each a stack of rows with what a
-setting is on the left and its control on the right. Open sections stay open across saves (main.js).{% endcomment %}
+<c-vars user zones current_zone connections providers notice="" />
+{% comment %}Settings, in All todos' frame: numbered sections that fold. Each row names a setting and says
+what it does on the left; its value, and the way to change it, sit on the right. All start folded
+(Meetings opens on the way back from connecting a calendar); open ones stay open across saves (main.js).{% endcomment %}
 <div class="overlay">
   <button type="button" class="overlay__scrim" aria-label="Close settings" data-action="overlay-close"></button>
   <div class="settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
@@ -13,12 +14,12 @@ setting is on the left and its control on the right. Open sections stay open acr
       {% if notice %}<p class="settings__notice" role="status">{{ notice }}</p>{% endif %}
       <c-ui.messages />
 
-      <details class="settings__group" data-group="general"{% if not notice %} open{% endif %}>
-        <summary class="settings__summary"><h2 class="settings__heading">General</h2><c-ui.icon name="chevron" size="14" class="settings__chevron" /></summary>
+      <details class="settings__group" data-group="general">
+        <summary class="settings__summary"><h2 class="eyebrow settings__heading">General</h2><c-ui.icon name="chevron" size="13" class="settings__chevron" /></summary>
         <div class="settings__row">
           <div class="settings__about">
             <p class="settings__label">Time zone</p>
-            <p class="settings__hint">Your days begin and end here. Scheduled todos and meetings follow it.</p>
+            <p class="settings__hint">Your days begin and end here.</p>
           </div>
           <form class="settings__control" hx-post="{% url 'board:settings-timezone' %}" hx-trigger="change" hx-target="#overlay" hx-swap="innerHTML">
             {% csrf_token %}
@@ -30,89 +31,41 @@ setting is on the left and its control on the right. Open sections stay open acr
       </details>
 
       <details class="settings__group" data-group="calendars"{% if notice %} open{% endif %}>
-        <summary class="settings__summary"><h2 class="settings__heading">Calendars</h2><c-ui.icon name="chevron" size="14" class="settings__chevron" /></summary>
-
-        {% if user.is_guest %}
-        <div class="settings__row">
+        <summary class="settings__summary"><h2 class="eyebrow settings__heading">Meetings</h2><c-ui.icon name="chevron" size="13" class="settings__chevron" /></summary>
+        <div class="settings__row settings__row--top">
           <div class="settings__about">
-            <p class="settings__label">Meetings</p>
-            <p class="settings__hint">Sign in to bring meetings from your calendars into the list.</p>
+            <p class="settings__label">Calendars</p>
+            <p class="settings__hint">Meetings from these calendars join your list, read only. Connect any Google account: it doesn't change who you're signed in as.</p>
           </div>
-          <div class="settings__control"><a class="text-btn text-btn--small" href="{% url 'accounts:login' %}">Sign in</a></div>
-        </div>
-        {% else %}
-        <div class="settings__row">
-          <div class="settings__about">
-            <p class="settings__label">Show meetings</p>
-            <p class="settings__hint">List today's meetings among your todos. Read only: they follow your calendar.</p>
-          </div>
-          <form class="settings__control" hx-post="{% url 'board:settings-meetings' %}" hx-trigger="change" hx-target="#overlay" hx-swap="innerHTML">
-            {% csrf_token %}
-            <input class="settings__check" type="checkbox" name="show_meetings" value="1" aria-label="Show meetings"{% if user.show_meetings %} checked{% endif %}>
-          </form>
-        </div>
-
-        {% for connection in connections %}
-        <div class="settings__row">
-          <div class="settings__about">
-            <p class="settings__label">{{ connection.email }}</p>
-            <p class="settings__hint">{% if connection.status != "connected" %}Lost access. Reconnect to keep its meetings.{% else %}{{ connection.get_provider_display }}{% endif %}</p>
-          </div>
-          <div class="settings__control">
-            {% if connection.status != "connected" %}
-            <a class="text-btn text-btn--small" href="{% url 'calendars:connect' connection.provider %}?hint={{ connection.email|urlencode }}">Reconnect</a>
-            {% endif %}
-            <c-ui.text-button class="text-btn--small" hx-post="{% url 'board:settings-disconnect' connection.id %}" hx-target="#overlay" hx-swap="innerHTML">Disconnect</c-ui.text-button>
-          </div>
-        </div>
-        {% if connection.status == "connected" %}
-        {% for source in connection.sources.all %}
-        <div class="settings__row settings__row--calendar">
-          <div class="settings__about">
-            <p class="settings__label">{{ source.name }}</p>
-            {% if source.is_primary %}<p class="settings__hint">Primary calendar</p>{% endif %}
-          </div>
-          <form class="settings__control" hx-post="{% url 'board:settings-source' source.id %}" hx-trigger="change" hx-target="#overlay" hx-swap="innerHTML">
-            {% csrf_token %}
-            <input class="settings__check" type="checkbox" name="enabled" value="1" aria-label="Show {{ source.name }}"{% if source.enabled %} checked{% endif %}>
-          </form>
-        </div>
-        {% endfor %}
-        {% endif %}
-        {% endfor %}
-
-        {% if providers %}
-        {% if suggested %}
-        <div class="settings__row">
-          <div class="settings__about">
-            <p class="settings__label">{{ suggested }}</p>
-            <p class="settings__hint">The Google account you signed in with.</p>
-          </div>
-          <div class="settings__control"><a class="text-btn text-btn--small" href="{% url 'calendars:connect' 'google' %}?hint={{ suggested|urlencode }}">Connect</a></div>
-        </div>
-        {% endif %}
-        {% for value, label in providers %}
-        <div class="settings__row">
-          <div class="settings__about">
-            <p class="settings__label">{% if connections or suggested %}Another {{ label }} account{% else %}{{ label }}{% endif %}</p>
-            <p class="settings__hint">Connect as many as you like. It doesn't change who you're signed in as.</p>
-          </div>
-          <div class="settings__control"><a class="text-btn text-btn--small" href="{% url 'calendars:connect' value %}">Connect</a></div>
-        </div>
-        {% endfor %}
-        {% else %}
-        <div class="settings__row">
-          <div class="settings__about">
-            <p class="settings__label">Connections</p>
+          <div class="settings__control settings__control--stack">
+            {% if user.is_guest %}
+            <a class="text-btn text-btn--small settings__add" href="{% url 'accounts:login' %}">Sign in to connect</a>
+            {% else %}
+            {% for connection in connections %}
+            <div class="calendar-pill{% if connection.status != 'connected' %} calendar-pill--lost{% endif %}"{% if connection.status != 'connected' %} title="Lost access"{% endif %}>
+              <c-ui.google size="14" class="calendar-pill__mark" />
+              <span class="calendar-pill__email" title="{{ connection.email }}{% if connection.status != 'connected' %}: lost access{% endif %}">{{ connection.email }}</span>
+              {% if connection.status == "connected" %}
+              <span class="calendar-pill__state">Connected</span>
+              <a class="icon-btn icon-btn--small calendar-pill__open" href="{{ connection.calendar_url }}" target="_blank" rel="noopener" aria-label="Open {{ connection.email }}'s calendar" title="Open calendar"><c-ui.icon name="out" size="13" sw="1.8" /></a>
+              {% else %}
+              <a class="text-btn text-btn--small calendar-pill__reconnect" href="{% url 'calendars:connect' connection.provider %}?hint={{ connection.email|urlencode }}">Reconnect</a>
+              {% endif %}
+              <c-ui.icon-button label="Disconnect {{ connection.email }}" title="Disconnect" class="icon-btn--small calendar-pill__remove" hx-post="{% url 'board:settings-disconnect' connection.id %}" hx-target="#overlay" hx-swap="innerHTML"><c-ui.icon name="x" size="12" /></c-ui.icon-button>
+            </div>
+            {% endfor %}
+            {% if providers %}
+            <a class="text-btn text-btn--small settings__add" href="{% url 'calendars:connect' 'google' %}">+ Add calendar</a>
+            {% else %}
             <p class="settings__hint">Calendar connections aren't set up on this server yet.</p>
+            {% endif %}
+            {% endif %}
           </div>
         </div>
-        {% endif %}
-        {% endif %}
       </details>
 
       <details class="settings__group" data-group="shortcuts">
-        <summary class="settings__summary"><h2 class="settings__heading">Shortcuts</h2><c-ui.icon name="chevron" size="14" class="settings__chevron" /></summary>
+        <summary class="settings__summary"><h2 class="eyebrow settings__heading">Shortcuts</h2><c-ui.icon name="chevron" size="13" class="settings__chevron" /></summary>
         <div class="settings__row settings__row--key"><p class="settings__label">Move through todos</p><span class="settings__keys"><kbd>↑</kbd><kbd>↓</kbd></span></div>
         <div class="settings__row settings__row--key"><p class="settings__label">Move a todo up or down</p><span class="settings__keys"><kbd>⇧</kbd><kbd>↑</kbd><kbd>↓</kbd></span></div>
         <div class="settings__row settings__row--key"><p class="settings__label">New todo</p><span class="settings__keys"><kbd>N</kbd></span></div>
