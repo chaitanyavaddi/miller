@@ -7,10 +7,9 @@
   /* Done rows close out the list but are not part of its order: nothing below moves or numbers them.
    * Timed rows (today's meetings) sort by their time after the user's own order, and stay put. */
   const ACTIVE = '.todo-row:not(.todo-row--done)';
-  const ORDERED = '.todo-row:not(.todo-row--done):not(.todo-row--timed)';
+  const ORDERED = '.todo-row:not(.todo-row--done)';  /* todos and meetings alike */
   const isOrdered = el => !!el && el.matches(ORDERED);
   const isSearching = () => !!list() && list().classList.contains('todo-list--searching');
-  const DATED = 'Meetings stay in time order, after your todos.';
 
   /* — search — */
   function openSearch() {
@@ -83,11 +82,10 @@
     next.scrollIntoView({ block: 'nearest' });
   }
 
-  /* Shift+↑/↓ swaps the selected todo with its neighbour in the user's order; timed ones don't move. */
+  /* Shift+↑/↓ swaps the selected todo (or meeting) with its neighbour in the user's order. */
   function move(direction) {
     const current = currentRow();
-    if (!current || isSearching()) return;
-    if (!isOrdered(current)) { notify(DATED); return; }
+    if (!current || isSearching() || !isOrdered(current)) return;
     const neighbour = direction < 0 ? current.previousElementSibling : current.nextElementSibling;
     if (!isOrdered(neighbour)) return;
     snap(current, () => rows().insertBefore(current, direction < 0 ? neighbour : neighbour.nextElementSibling));
@@ -132,9 +130,8 @@
     placed.animate([{ backgroundColor: 'rgba(38, 37, 30, 0.06)' }, { backgroundColor: 'transparent' }], { duration: 700, easing: 'ease-out' });
   }
 
-  /* — drag: hold a todo and drop it anywhere in the user's order; a drop saves at once. A timed one
-   *   (a meeting) can be picked up but not placed: it springs back, since its time orders it, and
-   *   a notice says so. Not while searching: a filtered list is not the whole order. — */
+  /* — drag: hold a todo or a meeting and drop it anywhere in the user's order; a drop saves at once.
+   *   Not while searching: a filtered list is not the whole order. — */
   let dragging = null;
   let mark = null;  /* the row the drop line sits above, or the list it ends */
 
@@ -160,7 +157,7 @@
     });
   }
 
-  /* The row a drop lands in front of. Over a timed or done row, or below everything, it lands at
+  /* The row a drop lands in front of. Over a row of the done list, or below everything, it lands at
    * the end of the user's order: in front of the first row that isn't part of it (null: the very end). */
   function rowBefore(e) {
     const row = e.target.closest('.todo-row');
@@ -168,7 +165,7 @@
       const box = row.getBoundingClientRect();
       return e.clientY > box.top + box.height / 2 ? row.nextElementSibling : row;
     }
-    return document.querySelector('#rows .todo-row--timed, #rows .todo-row--done');
+    return document.querySelector('#rows .todo-row--done');
   }
 
   function saveOrder() {
@@ -189,7 +186,7 @@
   });
 
   document.addEventListener('dragover', e => {
-    if (!dragging || !isOrdered(dragging) || !e.target.closest('#rows')) return;  /* no drop: a timed row flies back */
+    if (!dragging || !isOrdered(dragging) || !e.target.closest('#rows')) return;
     e.preventDefault();
     const before = rowBefore(e);
     if (before === dragging || before === dragging.nextElementSibling) markDrop(null);
@@ -216,10 +213,6 @@
 
   document.addEventListener('dragend', () => {
     if (dragging) dragging.classList.remove('todo-row--dragging');
-    if (dragging && !isOrdered(dragging)) {
-      if (!calm.matches) dragging.animate([{ backgroundColor: 'rgba(38, 37, 30, 0.06)' }, { backgroundColor: 'transparent' }], { duration: 700, easing: 'ease-out' });
-      notify(DATED);
-    }
     dragging = null;
     clearDropMarks();
   });
@@ -255,9 +248,9 @@
   refreshAtMidnight();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshIfNewDay(); });
 
-  /* — live meetings: a calendar push changes a meeting on the server within seconds; every 30s the
-   *   board asks for its meetings' stamp and reloads when it moved. Never mid-typing, mid-drag or
-   *   with a modal open: it just tries again next time. — */
+  /* — live meetings: a calendar push changes a meeting on the server within seconds; every minute (and
+   *   on coming back to the tab) the board asks for its meetings' stamp and reloads when it moved. Never
+   *   mid-typing, mid-drag or with a modal open: it just tries again next time. — */
   const stampUrl = document.getElementById('board-stamp')?.dataset.url;
   let meetingStamp = null;
 
@@ -278,7 +271,7 @@
   }
 
   checkMeetings();
-  setInterval(checkMeetings, 30000);
+  setInterval(checkMeetings, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) checkMeetings(); });
 
   /* — empty list: no message, just the composer, ready to type into. On load and whenever the

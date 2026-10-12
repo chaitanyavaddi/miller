@@ -17,8 +17,8 @@
           <button type="button" class="review__open" title="See its thread" hx-get="{% url 'board:review-thread' row.id %}" hx-target="#review-body" hx-swap="innerHTML">{{ row.title }}</button>
         </td>
         <td class="review__meta">{{ row.stamp }}</td>
-        <td class="review__meta review__meta--right">{{ row.days_on_list }}d</td>
-        <td class="review__action"><c-board.review-actions :row="row" quiet="1" /></td>
+        <td class="review__meta review__meta--right">{% if row.is_meeting %}meeting{% else %}{{ row.days_on_list }}d{% endif %}</td>
+        <td class="review__action">{% if not row.is_meeting %}<c-board.review-actions :row="row" quiet="1" />{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>

@@ -13,6 +13,7 @@ class Comment(models.Model):
     todo       = models.ForeignKey("todos.Todo", on_delete=models.CASCADE, related_name="comments")
     body       = models.TextField(blank=True)
     automatic  = models.BooleanField(default=False)  # written by Miller (e.g. "From Scheduled · …"), not the user
+    recording  = models.ForeignKey("recordings.Recording", on_delete=models.SET_NULL, null=True, blank=True, related_name="notes")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

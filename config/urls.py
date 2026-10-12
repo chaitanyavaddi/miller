@@ -11,4 +11,5 @@ urlpatterns = [
     path("", include("comments.urls")),
     path("", include("calendars.urls")),
     path("", include("scheduled.urls")),
+    path("", include("recordings.urls")),
 ]

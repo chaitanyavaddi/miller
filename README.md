@@ -42,17 +42,23 @@ Meetings come from the user's Google and Outlook calendars, read directly throug
 - Google console: enable the Calendar API; consent screen "In production" (in "Testing", refresh tokens die after 7 days), scope `calendar.events.readonly` only (sensitive: needs Google's app verification past 100 users); redirect URI `<SITE_URL>/calendars/google/callback/`.
 - Azure app: accounts in any org directory and personal Microsoft accounts (multi-tenant), redirect URI `<SITE_URL>/calendars/microsoft/callback/`, delegated `Calendars.Read` + `offline_access`, publisher verification for work accounts.
 - Push: Google and Graph only push to https. On an https `SITE_URL` each enabled calendar gets a channel to `<SITE_URL>/calendars/webhook/google/` or `/calendars/webhook/microsoft/`; nothing to register by hand. Locally (http) or if a provider refuses a channel, the scheduled sync keeps calendars fresh.
-- Run `python manage.py sync_calendars` every 15 minutes (`*/15 * * * *`): it renews push channels before they lapse (Google's last 7 days, Graph's about 3), picks up calendars added to an account, and catches missed pushes.
-- Scheduled todos: run `python manage.py produce_scheduled` every 15 minutes (`*/15 * * * *`). It puts what's due on each user's list just after their own midnight; safe to rerun. The board also does this on load.
+- Calendar upkeep runs hourly as a background job (`calendars.tasks.sync_all`): it renews push channels before they lapse (Google's last 7 days, Graph's about 3) and catches a missed push. `python manage.py sync_calendars` does the same by hand.
+- Recordings: a meeting can be recorded in the browser (the mic, plus a shared tab's audio for the call), uploaded in 10-second chunks; `recordings/` holds them. Stopping queues a background job: Groq's Whisper transcribes the tracks (You / Others, merged by clock time), the transcript lands under a note in the meeting's thread, and the audio is deleted. Every 15 minutes a job sweeps up recordings whose tab closed without Stop (or whose job was cut off). Env: `GROQ_API_KEY`, optional `GROQ_MODEL` (`whisper-large-v3`, or `whisper-large-v3-turbo`). To try transcription on a file: `python manage.py import_recording <todo_id> --mic you.m4a --call them.m4a`.
+- Scheduled todos: an hourly background job (`scheduled.tasks.produce_all`) puts what's due on each user's list soon after their midnight; the board also does this on load. `python manage.py produce_scheduled` does the same by hand.
+
+## Background jobs
+
+[django-q2](https://django-q2.readthedocs.io/), with its queue and schedules in the database (no Redis). Every recurring job is listed in `jobs/schedules.py`; `python manage.py ensure_schedules` writes them (the web container runs it on start). One-off jobs, like a recording to transcribe, are queued where they happen. The cluster runs as its own process: `python manage.py qcluster` (locally, in a second terminal). Settings: `Q_CLUSTER` in `config/settings/base.py`, `Q_WORKERS` (default 2). Finished and failed jobs are kept in its tables (`django_q_success`, `django_q_failure`).
 
 ## Docker
 
 ```sh
 docker build -t plain .
-docker run -p 8000:8000 --env-file .env.prod -v plain-media:/app/media plain
+docker run -p 8000:8000 --env-file .env.prod -v plain-media:/app/media plain           # web: migrates, schedules, serves
+docker run --env-file .env.prod -v plain-media:/app/media plain worker                  # jobs: the qcluster
 ```
 
-Prod needs `SECRET_KEY`, `GOOGLE_*`, `SITE_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `DB_*`.
+Prod needs `SECRET_KEY`, `GOOGLE_*`, `SITE_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `DB_*`. Run both containers from the same image with the same env and **the same media volume** (the worker reads the recordings' audio from it).
 
 ## Tests
 

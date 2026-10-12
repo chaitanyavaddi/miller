@@ -220,7 +220,7 @@ class CalendarService:
         """The same meeting already listed through another of the user's calendars."""
         if not fields.ical_uid:
             return None
-        return (TodoService.open_for(user)
+        return (TodoService.live_queryset().filter(user=user)  # an ended (closed) meeting is still the same meeting
                 .filter(kind=Todo.Kind.MEETING, starts_at=fields.starts_at, calendar_events__ical_uid=fields.ical_uid)
                 .first())
 
@@ -229,6 +229,7 @@ class CalendarService:
         return Todo.objects.create(
             user=user, kind=Todo.Kind.MEETING, title=fields.title,
             starts_at=fields.starts_at, ends_at=fields.ends_at, meeting_url=fields.meeting_url, event_url=fields.event_url,
+            closed_at=fields.ends_at if fields.ends_at < timezone.now() else None,
         )
 
     @staticmethod
@@ -238,7 +239,8 @@ class CalendarService:
         meeting.ends_at     = fields.ends_at
         meeting.meeting_url = fields.meeting_url
         meeting.event_url   = fields.event_url
-        meeting.save(update_fields=["title", "starts_at", "ends_at", "meeting_url", "event_url", "updated_at"])
+        meeting.closed_at   = fields.ends_at if fields.ends_at < timezone.now() else None  # over, or moved later
+        meeting.save(update_fields=["title", "starts_at", "ends_at", "meeting_url", "event_url", "closed_at", "updated_at"])
 
     @staticmethod
     def _unlink(event: CalendarEvent) -> None:

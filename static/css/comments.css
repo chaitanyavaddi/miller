@@ -33,3 +33,35 @@
 .composer:has(.composer__input:not(:placeholder-shown)) .composer__send,
 .composer--has-files .composer__send,
 .composer__send:hover { color: var(--text); }
+
+/* A meeting's transcript, in its own modal (from the meeting's menu): time, who, what. */
+.transcript-modal { position: relative; max-width: 640px; width: 100%; height: min(680px, calc(100vh - var(--overlay-top) - 24px)); display: flex; flex-direction: column; background: var(--bg); padding: 8px 0; }
+.transcript-modal__title { margin-top: 20px; font-size: 15px; line-height: 22px; font-weight: 500; letter-spacing: -0.015em; color: var(--text); }
+.transcript-modal__body { margin-top: 16px; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 12px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.transcript-modal__recording + .transcript-modal__recording { margin-top: 32px; }
+.transcript-modal__empty { font-size: 13px; color: var(--text-4); }
+.transcript__lines { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.transcript__line { display: grid; grid-template-columns: 52px 56px minmax(0, 1fr); column-gap: 8px; align-items: baseline; }
+.transcript__at { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-4); font-variant-numeric: tabular-nums; }
+.transcript__who { font-size: 12.5px; color: var(--text-4); }
+.transcript__text { font-size: 13.5px; line-height: 1.6; color: var(--text-2); overflow-wrap: anywhere; }
+/* The update composer, many lines: it grows with what's typed (or said), and past five lines scrolls behind
+   a hair-thin bar, its earliest lines fading out at the top. The +, the mic and Send stay on the last line. */
+.composer--multiline { height: auto; min-height: 40px; align-items: flex-end; }
+.composer--multiline .composer__plus { line-height: 40px; }
+.composer--multiline .composer__input { display: block; resize: none; line-height: 20px; padding: 10px 0; max-height: 120px; overflow-y: auto; }
+/* A hair of a bar: Chrome and Safari draw it 2px; Firefox (no way to go thinner) gets its thinnest. Firefox only, as the
+   standard property would override the 2px one in Chrome. */
+.composer--multiline .composer__input::-webkit-scrollbar { width: 2px; }
+.composer--multiline .composer__input::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.composer--multiline .composer__input::-webkit-scrollbar-track { background: transparent; }
+@supports (-moz-appearance: none) { .composer--multiline .composer__input { scrollbar-width: thin; scrollbar-color: var(--border) transparent; } }
+.composer--multiline .composer__input.is-scrolled { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22px); mask-image: linear-gradient(to bottom, transparent 0, #000 22px); }
+
+/* The mic: say it (a minute at most), and the words land in the composer to edit before sending. Listening, it shows
+   the level bars and the time (click to stop); then a moment while the words are written. */
+.composer__mic { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 24px; height: 40px; padding: 0; background: none; border: none; cursor: pointer;
+  color: var(--text-4); font-family: var(--font-mono); font-size: 11px; }
+.composer__mic:hover, .composer__mic:focus-visible { color: var(--text); }
+.composer__mic.is-listening { color: var(--text); }
+.composer__mic.is-writing { color: var(--text-4); cursor: default; }

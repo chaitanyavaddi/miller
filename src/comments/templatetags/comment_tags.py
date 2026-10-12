@@ -40,3 +40,12 @@ def linkify(text):
         last = end
     out.append(escape((text or "")[last:]))
     return mark_safe("".join(out))
+
+
+@register.filter
+def clock(seconds):
+    """A transcript line's time into the recording: 04:12, or 1:02:05 past the hour."""
+    seconds = int(seconds or 0)
+    hours, rest = divmod(seconds, 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes:02d}:{secs:02d}"

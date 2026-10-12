@@ -4,6 +4,7 @@ from datetime import datetime
 from django.utils import timezone
 
 from comments.service import CommentService
+from recordings.services import GroqService, RecordingService
 from scheduled import rhythm
 from scheduled.services import ProductionService
 from todos import reminders
@@ -23,6 +24,7 @@ class BoardRow:
     when: str = ""          # a meeting's start, as the row says it (10am)
     span: str = ""          # a meeting's start – end, as the thread says it
     meeting_url: str = ""
+    starts_iso: str = ""    # a meeting's start, for the page's "it started: record the call?" nudge
     event_url: str = ""     # a meeting's event in its calendar: the row links out to it
     from_schedule: bool = False  # Scheduled produced it today: a clock marks the row
     schedule_label: str = ""     # its rhythm, while the scheduled item is there: "every day"
@@ -31,11 +33,6 @@ class BoardRow:
     @property
     def is_meeting(self) -> bool:
         return self.kind == Todo.Kind.MEETING
-
-    @property
-    def is_timed(self) -> bool:
-        """Sorted by its time at the end of the list, not by the user: today's meetings."""
-        return self.is_meeting
 
     @property
     def shows_age(self) -> bool:
@@ -84,6 +81,7 @@ class BoardService:
             when=reminders.clock(todo.starts_at) if todo.is_meeting and todo.starts_at else "",
             span=f"{reminders.exact(todo.starts_at)} – {reminders.clock(todo.ends_at)}" if todo.is_meeting and todo.ends_at else "",
             meeting_url=todo.meeting_url,
+            starts_iso=todo.starts_at.isoformat() if todo.is_meeting and todo.starts_at else "",
             event_url=todo.event_url,
             is_done=todo.closed_at is not None,
             from_schedule=todo.produced_on == today,
@@ -104,7 +102,9 @@ class BoardService:
     def listing(user) -> dict:
         """Today's list: whatever scheduled items are due first land on it, then the user's order,
         today's meetings, and the last few done ones."""
-        ProductionService.produce_due(user)
+        ProductionService.produce_due(user)              # what's scheduled for today lands on top…
+        TodoService.place_todays_meetings(user)          # …and today's meetings above it; carry-overs follow
+        TodoService.close_ended_meetings(user)
         today = timezone.localdate()
         return {
             "rows":         BoardService.rows(user),
@@ -138,7 +138,10 @@ class BoardService:
         current = BoardService.select(context["rows"], selected_id)
         return {
             **context,
-            "current":  current,
-            "comments": CommentService.for_todo(current.id) if current else [],
-            "undo":     undo,
+            "current":    current,
+            "comments":   CommentService.for_todo(current.id) if current else [],
+            "undo":       undo,
+            "recorder":   RecordingService.composer(user, current),
+            "transcript": bool(current and current.is_meeting and RecordingService.has_transcript(current.id)),
+            "can_record": not user.is_guest and GroqService.is_configured(),  # the start-of-meeting nudge
         }

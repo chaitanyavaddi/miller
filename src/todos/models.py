@@ -26,6 +26,7 @@ class Todo(models.Model):
     ends_at     = models.DateTimeField(null=True, blank=True)   # meetings only
     meeting_url = models.URLField(max_length=1000, blank=True)  # meetings only: where to join
     event_url   = models.URLField(max_length=2000, blank=True)  # meetings only: the event in its calendar
+    listed_on   = models.DateField(null=True, blank=True)       # meetings only: the day it took its place in the order
     closed_at   = models.DateTimeField(null=True, blank=True)
     deleted_at  = models.DateTimeField(null=True, blank=True)
     created_at  = models.DateTimeField(auto_now_add=True)

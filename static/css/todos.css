@@ -50,11 +50,10 @@
 @keyframes drop-mark { from { opacity: 0; transform: scaleX(0.96); } }
 @media (prefers-reduced-motion: reduce) { .todo-row, .todo-row--drop-before::before, .todo-list__rows--drop-end::after { transition: none; animation: none; } }
 
-/* — timed todos: today's meetings sort by time at the end of the list, after the user's own
-     order. Dragging one only shows that it stays put; its tick column links out to the event. — */
-.todo-row--timed .todo-row__main { cursor: pointer; }
-.todo-row--timed:not(.todo-row--current) .todo-row__title { color: var(--text-4); }
-.todo-row--timed:hover .todo-row__title { color: var(--text); }
+/* — meetings: in the user's order like todos (today's arrive on top), read only; a quieter title, and the
+     tick column links out to the event. — */
+.todo-row--meeting:not(.todo-row--current) .todo-row__title { color: var(--text-4); }
+.todo-row--meeting:hover .todo-row__title { color: var(--text); }
 
 /* — notice: a quiet word in the bottom-right corner when something can't be done, gone on its own — */
 .notice { position: fixed; right: 24px; bottom: 24px; z-index: 30; max-width: 320px; padding: 10px 14px; font-size: 12.5px; color: var(--text-2);
@@ -82,6 +81,7 @@
 .todo-row__done { position: absolute; left: 0; top: 0; width: 44px; height: 36px; padding: 0; background: none; border: none; cursor: pointer;
   color: var(--text); display: flex; align-items: center; }
 .todo-row__done > span { display: flex; }
+.todo-row__done--fixed { cursor: default; pointer-events: none; }  /* a meeting's: shown, not clicked */
 .todo-row__tick-reopen { display: none !important; }
 .todo-row__done:is(:hover, :focus-visible) .todo-row__tick-done { display: none !important; }
 .todo-row__done:is(:hover, :focus-visible) .todo-row__tick-reopen { display: flex !important; }
@@ -99,3 +99,26 @@
   .todo-row__action { opacity: 1; }
   .todo-row__tick { opacity: 1; }  /* no hover on touch: the tick is always there */
 }
+
+/* — recorder: a quiet corner, bottom left (notices take the right), while a meeting records — */
+.recorder { position: fixed; left: 24px; bottom: 24px; z-index: 30; max-width: 420px; display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; row-gap: 2px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+.recorder[hidden] { display: none; }
+.recorder__line { display: inline-flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+/* Listening: three hairline bars rising and falling like a sound level, in the text's own colour. */
+.level { display: inline-flex; align-items: center; gap: 2px; height: 10px; flex: none; }
+.level i { display: block; width: 1.5px; height: 100%; background: currentColor; border-radius: 1px; transform-origin: center; animation: level 1s ease-in-out infinite; }
+.level i:nth-child(2) { animation-delay: -0.35s; }
+.level i:nth-child(3) { animation-delay: -0.7s; }
+@keyframes level { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+.recorder__note { flex-basis: 100%; font-size: 10.5px; color: var(--text-4); }
+.recorder__stop { color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .level i { animation: none; transform: scaleY(0.6); } }
+.recorder__dismiss { color: var(--text-4); }
+
+/* A meeting's call, recording: its state sits in the meeting's own thread, just above the composer. */
+.thread__call { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; row-gap: 2px; padding-top: 12px; flex: none;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+.thread__call[hidden] { display: none; }
+.thread__record.is-recording { display: none; }
+.todo-row__when .level { color: var(--text); }

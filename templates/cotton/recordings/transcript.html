@@ -1,0 +1,24 @@
+<c-vars todo recordings />
+{% comment %}A meeting's transcripts, opened from its menu: who said what, by time, one recording after another.{% endcomment %}
+<div class="overlay">
+  <button type="button" class="overlay__scrim" aria-label="Close" data-action="overlay-close"></button>
+  <div class="transcript-modal" role="dialog" aria-modal="true" aria-labelledby="transcript-title">
+    <div class="timeline__bar">
+      <span class="eyebrow timeline__title" id="transcript-title">Transcript</span>
+      <c-ui.icon-button label="Close" title="Close" class="icon-btn--small timeline__close" data-action="overlay-close"><c-ui.icon name="x" size="14" /></c-ui.icon-button>
+    </div>
+    <p class="transcript-modal__title">{{ todo.title }}</p>
+    <div class="transcript-modal__body">
+      {% for recording in recordings %}
+      <section class="transcript-modal__recording">
+        <p class="eyebrow transcript-modal__when">{{ recording.created_at|date:"M j, H:i" }} · {{ recording.duration|clock }}</p>
+        <ol class="transcript__lines">
+          {% for line in recording.transcript %}<li class="transcript__line"><span class="transcript__at">{{ line.at|clock }}</span><span class="transcript__who">{{ line.speaker }}</span><span class="transcript__text">{{ line.text|linkify }}</span></li>{% endfor %}
+        </ol>
+      </section>
+      {% empty %}
+      <p class="transcript-modal__empty">No transcript yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>

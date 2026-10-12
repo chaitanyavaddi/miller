@@ -142,14 +142,40 @@ class TodayListTests(TestCase):
     def listed(self):
         return list(TodoService.listed_for(self.user).values_list("title", flat=True))
 
-    def test_only_todays_meetings_that_havent_ended_are_listed_after_the_tasks(self):
+    def test_every_meeting_today_is_listed_on_top_and_an_ended_one_is_done(self):
         today_noon = timezone.localtime().replace(hour=12, minute=0, second=0, microsecond=0)
+        midnight = TodoService.start_of_today()
         Todo.objects.create(user=self.user, kind=Todo.Kind.MEETING, title="tomorrow", starts_at=today_noon + timedelta(days=1), ends_at=today_noon + timedelta(days=1, hours=1))
-        self.meeting("over", -3)
+        Todo.objects.create(user=self.user, kind=Todo.Kind.MEETING, title="yesterday", starts_at=midnight - timedelta(hours=3), ends_at=midnight - timedelta(hours=2))
+        over = Todo.objects.create(user=self.user, kind=Todo.Kind.MEETING, title="over", starts_at=midnight, ends_at=midnight + timedelta(seconds=1))
+        TodoService.place_todays_meetings(self.user)
+        TodoService.close_ended_meetings(self.user)
         listed = self.listed()
-        self.assertEqual(listed[:2], ["todo 1", "todo 2"])
+        self.assertEqual(listed, ["over", "todo 1", "todo 2"])  # ended today: still on the list (on top), done
         self.assertNotIn("tomorrow", listed)
-        self.assertNotIn("over", listed)
+        self.assertNotIn("yesterday", listed)  # gone to Past
+        over.refresh_from_db()
+        self.assertEqual(over.closed_at, over.ends_at)
+        self.assertIn("yesterday", list(TodoService.reviewed(self.user).values_list("title", flat=True)))
+
+    def test_a_new_day_opens_with_its_meetings_then_scheduled_then_carry_overs(self):
+        start = TodoService.start_of_today() + timedelta(hours=23)
+        later = Todo.objects.create(user=self.user, kind=Todo.Kind.MEETING, title="late call", starts_at=start, ends_at=start + timedelta(minutes=30))
+        early = Todo.objects.create(user=self.user, kind=Todo.Kind.MEETING, title="standup", starts_at=start - timedelta(hours=1), ends_at=start - timedelta(minutes=30))
+        TodoService.produce(self.user, "water plants", None, timezone.localdate())  # Scheduled lands first…
+        TodoService.place_todays_meetings(self.user)                                # …then the meetings go above it
+        self.assertEqual(self.listed(), ["standup", "late call", "water plants", "todo 1", "todo 2"])
+        self.assertEqual([t.position for t in TodoService.listed_for(self.user)], [1, 2, 3, 4, 5])
+        self.assertEqual({early.pk, later.pk}, set(Todo.objects.filter(listed_on=timezone.localdate()).values_list("pk", flat=True)))
+
+    def test_a_placed_meeting_moves_like_a_todo_and_stays_where_it_was_put(self):
+        start = TodoService.start_of_today() + timedelta(hours=23)
+        meeting = Todo.objects.create(user=self.user, kind=Todo.Kind.MEETING, title="standup", starts_at=start, ends_at=start + timedelta(minutes=30))
+        TodoService.place_todays_meetings(self.user)
+        todo_1, todo_2 = Todo.objects.get(title="todo 1"), Todo.objects.get(title="todo 2")
+        TodoService.reorder(self.user, TodoReorderSchema(ids=[todo_1.id, meeting.id, todo_2.id]))
+        TodoService.place_todays_meetings(self.user)  # already placed today: it isn't pulled back to the top
+        self.assertEqual(self.listed(), ["todo 1", "standup", "todo 2"])
 
     def test_a_produced_todo_goes_to_the_top(self):
         TodoService.produce(self.user, "water plants", None, timezone.localdate())

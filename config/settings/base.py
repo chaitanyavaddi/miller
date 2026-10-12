@@ -17,7 +17,10 @@ INSTALLED_APPS = [
     "comments",
     "calendars",
     "scheduled",
+    "recordings",
+    "jobs",
     "board",
+    "django_q",
 ]
 
 MIDDLEWARE = [
@@ -69,6 +72,24 @@ GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", "")
 MICROSOFT_CLIENT_ID = env("MICROSOFT_CLIENT_ID", "")
 MICROSOFT_CLIENT_SECRET = env("MICROSOFT_CLIENT_SECRET", "")
 CALENDAR_TOKEN_KEY = env("CALENDAR_TOKEN_KEY", "")
+# Recordings are transcribed by Groq's Whisper; without a key, nothing is (and Record isn't offered).
+GROQ_API_KEY = env("GROQ_API_KEY", "")
+GROQ_MODEL = env("GROQ_MODEL", "whisper-large-v3")  # or whisper-large-v3-turbo: cheaper, a little less accurate
+
+# Background jobs: django-q2, its queue and schedules in the database (no Redis). The cluster runs as its
+# own process: `python manage.py qcluster`. Recurring jobs are listed in jobs/schedules.py.
+Q_CLUSTER = {
+    "name":         "miller",
+    "orm":          "default",
+    "workers":      int(env("Q_WORKERS", "2")),
+    "timeout":      900,     # a job running longer than 15 minutes is stopped (an hour's audio takes well under one)
+    "retry":        960,     # must exceed timeout
+    "max_attempts": 1,       # recordings keep their own attempts and recover through the 15-minute sweep
+    "poll":         5,       # seconds between looks at the queue table: light on the database
+    "save_limit":   200,     # finished jobs kept in django_q_success
+    "catch_up":     False,   # after downtime, run a missed schedule once, not once per missed slot
+    "label":        "Jobs",
+}
 SITE_URL = env("SITE_URL", "http://localhost:8000").rstrip("/")
 
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 365  # a guest's identity is this cookie

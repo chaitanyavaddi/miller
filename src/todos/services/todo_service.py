@@ -51,35 +51,65 @@ class TodoService:
 
     @staticmethod
     def ordered_for(user) -> QuerySet:
-        """The user's own order: their open tasks, and those done today — a done todo keeps its place,
-        struck through, until the day is over."""
-        done_today = Q(closed_at__gte=TodoService.start_of_today())
-        return (TodoService.live_queryset().filter(user=user, kind=Todo.Kind.TASK, moves__isnull=True)
-                .filter(Q(closed_at__isnull=True) | done_today))
+        """The user's own order: their open tasks and those done today (a done todo keeps its place,
+        struck through, until the day is over), and today's meetings, ended ones included."""
+        midnight = TodoService.start_of_today()
+        tasks = Q(kind=Todo.Kind.TASK, moves__isnull=True) & (Q(closed_at__isnull=True) | Q(closed_at__gte=midnight))
+        if user.show_meetings:
+            tasks |= Q(kind=Todo.Kind.MEETING, starts_at__gte=midnight, starts_at__lt=midnight + timedelta(days=1))
+        return TodoService.live_queryset().filter(user=user).filter(tasks)
 
     @staticmethod
     def listed_for(user) -> QuerySet:
-        """Today's list: the user's tasks in their order (today's done ones still in place), then (if
-        the user shows them) today's meetings that haven't ended, by start time. A todo moved to a later
-        date isn't on it until that day."""
-        now = timezone.localtime()
+        """Today's list, in the user's order: their tasks (today's done ones still in place) and (if the
+        user shows them) every meeting starting today, which arrives on top and then moves like a todo; one
+        that's ended is done, still in its place. A todo moved to a later date isn't on it until that day."""
         midnight = TodoService.start_of_today()
         shown = Q(kind=Todo.Kind.TASK) & (Q(closed_at__isnull=True) | Q(closed_at__gte=midnight))
         if user.show_meetings:
-            shown |= Q(kind=Todo.Kind.MEETING, closed_at__isnull=True, ends_at__gte=now, starts_at__lt=midnight + timedelta(days=1))
+            shown |= Q(kind=Todo.Kind.MEETING, starts_at__gte=midnight, starts_at__lt=midnight + timedelta(days=1))
         return (TodoService.live_queryset().filter(user=user, moves__isnull=True).filter(shown).select_related("scheduled_item")
-                .order_by(F("starts_at").asc(nulls_first=True), "position", "id"))
+                .order_by("position", "id"))
+
+    @staticmethod
+    @transaction.atomic
+    def place_todays_meetings(user) -> int:
+        """Today's meetings that haven't taken a place in the order yet go on top, in time order: the day
+        opens with its meetings, then whatever came before. Each is placed once; after that it moves like a
+        todo. One that turns up later in the day (a new invite) also arrives on top."""
+        if not user.show_meetings:
+            return 0
+        today = timezone.localdate()
+        midnight = TodoService.start_of_today()
+        arriving = list(Todo.objects.filter(user=user, kind=Todo.Kind.MEETING, deleted_at__isnull=True,
+                                            starts_at__gte=midnight, starts_at__lt=midnight + timedelta(days=1))
+                        .exclude(listed_on=today).order_by("starts_at", "id"))
+        if not arriving:
+            return 0
+        rest = [todo for todo in TodoService.ordered_for(user).order_by("position", "id") if todo not in arriving]
+        for todo in arriving:
+            todo.listed_on = today
+        Todo.objects.bulk_update(arriving, ["listed_on"])
+        TodoService._number(arriving + rest)
+        return len(arriving)
+
+    @staticmethod
+    def close_ended_meetings(user) -> int:
+        """A meeting is done once it's over: closed at its end, like a todo ticked off. Run as the list is
+        read; a meeting the calendar moves later opens again on sync."""
+        return (Todo.objects.filter(user=user, kind=Todo.Kind.MEETING, closed_at__isnull=True, deleted_at__isnull=True,
+                                    ends_at__lt=timezone.now()).update(closed_at=F("ends_at")))
 
     @staticmethod
     def reviewed(user) -> QuerySet:
-        """The user's closed todos, the most recently closed first; deleted ones never show."""
-        return (Todo.objects.filter(user=user, kind=Todo.Kind.TASK, closed_at__isnull=False, deleted_at__isnull=True)
+        """The user's closed todos and ended meetings, the most recently closed first; deleted ones never show."""
+        return (Todo.objects.filter(user=user, closed_at__isnull=False, deleted_at__isnull=True)
                 .order_by("-closed_at"))
 
     @staticmethod
     def recently_closed(user, limit: int) -> QuerySet:
-        """Done before today: today's are still in their place on the list."""
-        return (Todo.objects.filter(user=user, closed_at__lt=TodoService.start_of_today(), deleted_at__isnull=True)
+        """Todos done before today (today's are still in their place on the list). Meetings go to Past."""
+        return (Todo.objects.filter(user=user, kind=Todo.Kind.TASK, closed_at__lt=TodoService.start_of_today(), deleted_at__isnull=True)
                 .order_by("-closed_at")[:limit])
 
     @staticmethod
@@ -149,8 +179,8 @@ class TodoService:
     @staticmethod
     @transaction.atomic
     def reorder(user, data) -> None:
-        """Apply the order given; any task the client didn't mention keeps its relative place at the
-        end. Meetings aren't part of it: their time orders them."""
+        """Apply the order given (todos and today's meetings alike); any the client didn't mention keep
+        their relative place at the end."""
         by_id = {t.id: t for t in TodoService.ordered_for(user)}
         ordered = [by_id.pop(i) for i in data.ids if i in by_id] + list(by_id.values())
         TodoService._number(ordered)

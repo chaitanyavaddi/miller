@@ -309,6 +309,13 @@ class MeetingBoardTests(TestCase):
         self.meeting.delete()
         self.assertNotEqual(self.client.get(reverse("board:stamp")).json()["stamp"], before)
 
+    def test_an_ended_meeting_shows_the_done_tick_with_nothing_to_reopen(self):
+        midnight = TodoService.start_of_today()
+        ended = Todo.objects.create(user=self.user, kind=Todo.Kind.MEETING, title="Earlier sync", starts_at=midnight, ends_at=midnight + timedelta(seconds=1))
+        page = self.client.get(reverse("board:index")).content.decode()
+        self.assertIn('class="todo-row__done todo-row__done--fixed"', page)
+        self.assertNotIn(f'hx-post="{reverse("board:todo-reopen", args=[ended.id])}"', page)
+
     def test_a_meeting_cannot_be_closed_or_renamed(self):
         self.assertEqual(self.client.post(reverse("board:todo-close", args=[self.meeting.id])).status_code, 403)
         self.assertEqual(self.client.post(reverse("board:todo-rename", args=[self.meeting.id]), {"title": "x"}).status_code, 403)

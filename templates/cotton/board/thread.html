@@ -1,10 +1,25 @@
-<c-vars current comments focus="" />
+<c-vars current comments focus="" recorder="" transcript="" />
 <article class="board__pane thread" id="thread" aria-label="Thread">
 {% if current %}
   <div class="pane-bar">
     {% if current.is_meeting %}
     <span class="thread__crumb"><b class="thread__crumb-strong">Meeting</b>{% if current.span %} · {{ current.span }}{% endif %}</span>
-    {% if current.meeting_url %}<a class="text-btn text-btn--small thread__join" href="{{ current.meeting_url }}" target="_blank" rel="noopener">Join</a>{% endif %}
+    <span class="thread__actions">
+      {% if recorder.call_url %}
+      {# A meeting that's on: record its call (the mic, and the call's tab). recorder.js runs it; its state shows below. #}
+      <button type="button" class="text-btn text-btn--small thread__record" data-record data-record-url="{{ recorder.call_url }}" data-record-title="{{ current.title }}" data-record-todo="{{ current.id }}">{% if recorder.call_resumable %}Resume call{% else %}Record call{% endif %}</button>
+      {% endif %}
+      {% if current.meeting_url %}<a class="text-btn text-btn--small thread__join" href="{{ current.meeting_url }}" target="_blank" rel="noopener">Join</a>{% endif %}
+      {% if transcript %}
+      <c-ui.icon-button label="More" title="More" class="icon-btn--small thread__more" data-action="thread-menu" aria-haspopup="menu" aria-controls="thread-menu" aria-expanded="false"><c-ui.icon name="more" size="14" /></c-ui.icon-button>
+      {# A meeting's menu, drawn as the account menu: what its recordings left, out of the thread's way. #}
+      <div class="account-menu thread-menu" id="thread-menu" role="menu">
+        <div class="account-menu__section">
+          <c-ui.text-button class="account-menu__action" role="menuitem" hx-get="{% url 'recordings:transcript' current.id %}" hx-target="#overlay" hx-swap="innerHTML">Transcript</c-ui.text-button>
+        </div>
+      </div>
+      {% endif %}
+    </span>
     {% else %}
     <span class="thread__crumb">{% if current.is_done %}<b class="thread__crumb-strong">Done today</b>{% else %}<b class="thread__crumb-strong">#{{ current.position }} today</b>{% endif %}{% if current.schedule_label %} · {{ current.schedule_label }}{% elif current.from_schedule %} · from scheduled{% endif %}{% if current.shows_age %} · {{ current.added }}{% endif %}</span>
     <span class="thread__actions">
@@ -39,6 +54,7 @@
     </div>
     {% endfor %}
   </div>
-  <c-comments.form :todo_id="current.id" :focus="focus" />
+  {% if current.is_meeting %}<div class="thread__call" data-call-slot="{{ current.id }}" role="status" aria-live="polite" hidden></div>{% endif %}
+  <c-comments.form :todo_id="current.id" :focus="focus" :recorder="recorder" :title="current.title" />
 {% endif %}
 </article>

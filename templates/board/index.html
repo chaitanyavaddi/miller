@@ -12,15 +12,17 @@
 <script src="{% static 'js/comments.js' %}" defer></script>
 <script src="{% static 'js/scheduled.js' %}" defer></script>
 <script src="{% static 'js/timeline.js' %}" defer></script>
+<script src="{% static 'js/recorder.js' %}" defer></script>
 {% endblock %}
 
 {% block content %}
 <c-layout.topbar :user="request.user" />
 <div class="page">
-  <c-board.workspace :rows="rows" :current="current" :today_label="today_label" :comments="comments" :undo="undo" :done="done" :reopen_index="reopen_index" />
+  <c-board.workspace :rows="rows" :current="current" :today_label="today_label" :comments="comments" :undo="undo" :done="done" :reopen_index="reopen_index" :recorder="recorder" :transcript="transcript" :can_record="can_record" />
 </div>
 <div id="overlay"{% if request.GET.settings %} hx-get="{% url 'board:settings' %}" hx-trigger="load" hx-swap="innerHTML"{% endif %}></div>
 <div class="notice" id="notice" role="status" aria-live="polite"></div>
+<div class="recorder" id="recorder" role="status" aria-live="polite" hidden></div>
 <span hidden id="board-stamp" data-url="{% url 'board:stamp' %}"></span>
 {% if not request.user.timezone %}<span hidden id="timezone-detect" data-url="{% url 'board:settings-timezone' %}"></span>{% endif %}
 {% endblock %}

@@ -1,5 +1,5 @@
 <c-vars row current="" />
-<div class="todo-row{% if row.is_timed %} todo-row--timed{% endif %}{% if row.is_meeting %} todo-row--meeting{% endif %}{% if row.is_done %} todo-row--closed{% endif %}{% if row.id == current %} todo-row--current{% endif %}" data-id="{{ row.id }}" draggable="true">
+<div class="todo-row{% if row.is_meeting %} todo-row--meeting{% endif %}{% if row.is_done %} todo-row--closed{% endif %}{% if row.id == current %} todo-row--current{% endif %}" data-id="{{ row.id }}" draggable="true">
   <button type="button" class="todo-row__main" hx-get="{% url 'board:todo-detail' row.id %}" hx-target="#thread" hx-swap="outerHTML" hx-sync="#rows:replace" hx-preload="mouseover">
     <span class="todo-row__pos">{% if not row.is_done %}{{ row.position|pad2 }}{% endif %}</span>
     <span id="todo-title-{{ row.id }}" class="todo-row__title">{{ row.title }}</span>
@@ -11,7 +11,10 @@
     <span class="todo-row__age"{% if row.shows_age %} title="{{ row.days_on_list|capfirst }}">{{ row.age }}d{% elif row.from_schedule %} title="From Scheduled{% if row.schedule_label %} · {{ row.schedule_label }}{% endif %}"><c-ui.icon name="alarm" size="13" sw="1.6" />{% else %}>{% endif %}</span>
     {% endif %}
   </button>
-  {% if row.is_done %}
+  {% if row.is_done and row.is_meeting %}
+  {# An ended meeting: the same tick in its number's place, but nothing to reopen (it follows the calendar). #}
+  <span class="todo-row__done todo-row__done--fixed" title="Ended"><span class="todo-row__tick-done"><c-ui.icon name="check" size="12" sw="2" /></span></span>
+  {% elif row.is_done %}
   {# Done today: its tick stands in for its number (the others keep theirs); hovered, it turns into reopen. #}
   <button type="button" class="todo-row__done" aria-label="{{ row.title }}: done — reopen" title="Reopen"
           hx-post="{% url 'board:todo-reopen' row.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML">
