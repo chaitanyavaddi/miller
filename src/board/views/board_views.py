@@ -1,4 +1,4 @@
-from django.db.models import Count, Max
+from django.db.models import Count, Max, Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
@@ -9,6 +9,7 @@ from accounts.mixins import GuestSessionMixin, SignedInRequiredMixin
 from board.mixins import BoardResponseMixin
 from board.services import BoardService
 from todos.models import Todo
+from todos.services import TodoService
 from utils.view_helper import redirect_to
 
 
@@ -36,9 +37,13 @@ class BoardWorkspaceView(SignedInRequiredMixin, BoardResponseMixin, View):
 
 class BoardStampView(SignedInRequiredMixin, View):
     """A fingerprint of the user's meetings, polled by the open board: when a calendar push changes
-    one (moved, renamed, cancelled), the stamp changes and the board reloads itself."""
+    one (moved, renamed, cancelled), or one's time runs out, the stamp changes and the board reloads
+    itself. Ending meetings are closed here too, so one turns done within a poll of its end."""
 
     def get(self, request):
-        meetings = Todo.objects.filter(user=request.user, kind=Todo.Kind.MEETING).aggregate(count=Count("id"), changed=Max("updated_at"))
+        TodoService.close_ended_meetings(request.user)
+        meetings = Todo.objects.filter(user=request.user, kind=Todo.Kind.MEETING).aggregate(
+            count=Count("id"), changed=Max("updated_at"), closed=Count("id", filter=Q(closed_at__isnull=False)),
+        )
         changed = meetings["changed"].isoformat() if meetings["changed"] else ""
-        return JsonResponse({"stamp": f"{meetings['count']}:{changed}"})
+        return JsonResponse({"stamp": f"{meetings['count']}:{meetings['closed']}:{changed}"})

@@ -304,6 +304,14 @@ class MeetingBoardTests(TestCase):
         page = self.client.get(reverse("board:index"))
         self.assertContains(page, 'class="todo-row__tick todo-row__out" href="https://www.google.com/calendar/event?eid=abc" target="_blank"')
 
+    def test_the_meeting_stamp_moves_when_a_meeting_ends(self):
+        before = self.client.get(reverse("board:stamp")).json()["stamp"]
+        Todo.objects.filter(pk=self.meeting.pk).update(starts_at=timezone.now() - timedelta(hours=2), ends_at=timezone.now() - timedelta(minutes=1))
+        after = self.client.get(reverse("board:stamp")).json()["stamp"]
+        self.assertNotEqual(after, before)
+        self.meeting.refresh_from_db()
+        self.assertIsNotNone(self.meeting.closed_at)  # closed by the poll itself, so the reload shows it done
+
     def test_the_meeting_stamp_moves_when_a_meeting_changes(self):
         before = self.client.get(reverse("board:stamp")).json()["stamp"]
         self.meeting.delete()
