@@ -55,9 +55,9 @@ class CalendarCallbackView(CalendarFlowMixin, View):
 
 @method_decorator(csrf_exempt, name="dispatch")
 class CalendarWebhookView(View):
-    """Push notifications that a calendar changed: we re-read it. Each carries the secret its channel
-    was opened with, so anyone else's POST does nothing. A failed sync answers 502 so the provider
-    retries it."""
+    """Push notifications that a calendar changed: a background job re-reads it (the database is current
+    within seconds, whether or not anyone has Miller open). Each push carries the secret its channel was
+    opened with, so anyone else's POST does nothing."""
 
     def post(self, request, provider):
         if provider == CalendarConnection.Provider.GOOGLE:
@@ -93,9 +93,8 @@ class CalendarWebhookView(View):
         return self.sync(sources.values(), status=202)
 
     def sync(self, sources, status=200):
-        try:
-            for source in sources:
-                CalendarService.sync_source(source)
-        except CalendarApiError:
-            return HttpResponse(status=502)
+        """Queue a re-read of each calendar and answer at once. A burst of pushes for one change (providers
+        send several) queues it once."""
+        for source in sources:
+            CalendarService.queue_sync(source)
         return HttpResponse(status=status)

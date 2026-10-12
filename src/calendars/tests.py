@@ -268,23 +268,29 @@ class WebhookTests(CalendarTestCase):
         return self.client.post(reverse("calendars:webhook", args=["google"]), HTTP_X_GOOG_CHANNEL_ID="ch-1",
                                 HTTP_X_GOOG_CHANNEL_TOKEN=token, HTTP_X_GOOG_RESOURCE_STATE=state)
 
-    @patch.object(CalendarService, "sync_source")
-    def test_a_google_push_with_the_channel_secret_resyncs_that_calendar(self, sync_source):
+    @patch("django_q.tasks.async_task")
+    def test_a_google_push_with_the_channel_secret_queues_a_resync_and_answers_at_once(self, async_task):
         self.assertEqual(self.google_push(self.secret).status_code, 200)
-        self.assertEqual(sync_source.call_args.args[0], self.source)
+        self.assertEqual(async_task.call_args.args, ("calendars.tasks.sync_source", self.source.pk))
 
-    @patch.object(CalendarService, "sync_source")
-    def test_a_forged_google_push_or_a_channel_hello_does_nothing(self, sync_source):
+    @patch("django_q.tasks.async_task")
+    def test_a_burst_of_pushes_for_one_change_queues_one_resync(self, async_task):
+        for _ in range(3):
+            self.google_push(self.secret)
+        self.assertEqual(async_task.call_count, 1)
+
+    @patch("django_q.tasks.async_task")
+    def test_a_forged_google_push_or_a_channel_hello_does_nothing(self, async_task):
         self.assertEqual(self.google_push("forged").status_code, 200)
         self.assertEqual(self.google_push(self.secret, state="sync").status_code, 200)
-        sync_source.assert_not_called()
+        async_task.assert_not_called()
 
     def test_graph_validation_echoes_the_token(self):
         response = self.client.post(reverse("calendars:webhook", args=["microsoft"]) + "?validationToken=abc%20123")
         self.assertEqual((response.status_code, response.content, response["Content-Type"]), (200, b"abc 123", "text/plain"))
 
-    @patch.object(CalendarService, "sync_source")
-    def test_graph_notifications_resync_only_calendars_with_a_matching_client_state(self, sync_source):
+    @patch("django_q.tasks.async_task")
+    def test_graph_notifications_resync_only_calendars_with_a_matching_client_state(self, async_task):
         CalendarConnection.objects.filter(pk=self.connection.pk).update(provider="microsoft")
         body = {"value": [
             {"subscriptionId": "sub-1", "clientState": self.secret},
@@ -292,11 +298,21 @@ class WebhookTests(CalendarTestCase):
             {"subscriptionId": "sub-1", "clientState": "forged"},
         ]}
         response = self.client.post(reverse("calendars:webhook", args=["microsoft"]), json.dumps(body), content_type="application/json")
-        self.assertEqual((response.status_code, sync_source.call_count), (202, 1))
+        self.assertEqual((response.status_code, async_task.call_count), (202, 1))
 
-    @patch.object(CalendarService, "sync_source", side_effect=CalendarApiError("down"))
-    def test_a_failed_sync_asks_the_provider_to_retry(self, sync_source):
-        self.assertEqual(self.google_push(self.secret).status_code, 502)
+    def test_the_queued_job_rereads_the_calendar_into_the_database(self):
+        from calendars.tasks import sync_source
+        api = FakeApi(events={"primary-id": [remote("e1", self.start, title="New invite")]})
+        with patch.dict(GOOGLE, {"google": api}):
+            self.assertTrue(sync_source(self.source.pk))
+        self.assertEqual(self.meetings(), ["New invite"])
+
+    @patch("calendars.tasks.time.sleep")
+    def test_the_job_tries_again_when_the_provider_stumbles(self, sleep):
+        from calendars.tasks import sync_source
+        with patch.object(CalendarService, "sync_source", side_effect=[CalendarApiError("down"), None]) as resync:
+            self.assertTrue(sync_source(self.source.pk))
+        self.assertEqual(resync.call_count, 2)
 
 
 @override_settings(CALENDAR_TOKEN_KEY=KEY, GOOGLE_CLIENT_ID="id", GOOGLE_CLIENT_SECRET="secret")

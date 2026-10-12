@@ -23,6 +23,7 @@ SYNC_LOOKBACK = timedelta(days=1)    # today's earlier meetings still show; olde
 SYNC_LOOKAHEAD = timedelta(days=14)  # meetings are listed on their day; two weeks is plenty of notice
 RENEW_BEFORE = timedelta(days=1)     # push channels are renewed when they'd lapse within this
 ACCESS_TOKEN_TTL = 50 * 60           # both providers issue hour-long access tokens
+SYNC_DEBOUNCE = 10                   # seconds: pushes for one calendar within this queue one re-read
 
 
 class CalendarService:
@@ -155,6 +156,16 @@ class CalendarService:
         user = source.connection.user
         meeting = CalendarService._twin(user, fields) or CalendarService._create(user, fields)
         CalendarEvent.objects.create(source=source, meeting=meeting, external_id=event.external_id, ical_uid=fields.ical_uid)
+
+    @staticmethod
+    def queue_sync(source: CalendarSource) -> bool:
+        """Have the worker re-read this calendar soon. Skipped if it was queued in the last few seconds
+        (one change often brings several pushes)."""
+        from django_q.tasks import async_task
+        if not cache.add(f"calendar-sync-queued:{source.pk}", True, SYNC_DEBOUNCE):
+            return False
+        async_task("calendars.tasks.sync_source", source.pk, task_name=f"Sync calendar {source.pk}")
+        return True
 
     # Push channels
 
