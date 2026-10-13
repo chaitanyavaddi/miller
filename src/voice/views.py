@@ -82,17 +82,18 @@ class VoiceCommandView(SignedInRequiredMixin, View):
         tell("voice-heard", {"turn": turn, "text": command.transcript})
 
         history = CommandService.history(user, command.session)
+        done_earlier = CommandService.done_earlier(user)
         open_id = whole(request.headers.get("X-Voice-Open", ""))   # the thread on screen: what "this one" means
         try:
             decision, command.decide_ms = DecisionService.decide(
-                command.transcript, todos, history, notes=CommandService.notes_for(todos), open_id=open_id)
+                command.transcript, todos, history, notes=CommandService.notes_for(todos), open_id=open_id, done_earlier=done_earlier)
         except DecisionError:
             return finish("Couldn't work that out. Try again.", VoiceCommand.Outcome.FAILED)
         command.model, command.llm_cost = decision.model, decision.cost
         command.tokens_in, command.tokens_out = decision.tokens_in, decision.tokens_out
         command.operations = [o.as_dict() for o in decision.operations]
 
-        valid, problems = CommandService.validate(todos, decision.operations)
+        valid, problems = CommandService.validate(todos, decision.operations, done_earlier)
         if not valid:
             if decision.reply:
                 return finish(decision.reply, VoiceCommand.Outcome.ASKED)

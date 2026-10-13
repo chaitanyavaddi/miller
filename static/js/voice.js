@@ -73,6 +73,11 @@
     undoButton.hidden = !undoId;
   }
 
+  /* The bar is as tall as its words; the page keeps that much room clear at the foot (voice.css reads --voice-h). */
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => document.documentElement.style.setProperty('--voice-h', `${Math.round(bar.getBoundingClientRect().height)}px`)).observe(bar);
+  }
+
   /* ———————————————————————— turning voice mode on and off ———————————————————————— */
 
   async function setOn(value) {
@@ -160,12 +165,24 @@
     if (seg.recorder.state !== 'inactive') seg.recorder.stop();
   }
 
+  /* A browser keeps audio asleep until the person touches the page (a reload with voice mode remembered, say):
+     the first tap or key wakes it, and until then the bar says so instead of sitting there deaf. */
+  let sleeping = false;
+  const awaken = () => { if (audio && audio.state === 'suspended') audio.resume().catch(() => {}); };
+  ['pointerdown', 'keydown', 'touchstart'].forEach(name => document.addEventListener(name, awaken, { passive: true, capture: true }));
+
+  let lastTick = Date.now();
+
   function tick() {
+    const now = Date.now(), elapsed = Math.min(now - lastTick, 1000);   /* real time since the last look: a throttled page looks less often */
+    lastTick = now;
+    const asleep = !!audio && audio.state === 'suspended';
+    if (asleep !== sleeping) { sleeping = asleep; if (state === 'listening') hint.textContent = asleep ? 'Tap anywhere to start' : 'Listening'; }
+    if (asleep) { awaken(); return; }
     level += (readLevel() - level) * 0.5;
     if (!seg || state !== 'listening') return;
-    const now = Date.now();
     const threshold = Math.max(0.03, floor * 2.5);
-    if (level > threshold) { seg.voiced += TICK_MS; seg.lastVoice = now; }
+    if (level > threshold) { seg.voiced += elapsed; seg.lastVoice = now; }
     else floor += (Math.min(level, 0.1) - floor) * 0.02;   /* learn the room's own noise */
     const spoke = seg.voiced >= MIN_VOICED_MS;
     const quiet = now - seg.lastVoice;

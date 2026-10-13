@@ -268,8 +268,7 @@ class MoveTests(VoiceBase):
             self.assertEqual((valid, len(problems)), ([], 1), args)
         _, problems = self.move(self.budget, "position", position=0)
         self.assertEqual(len(problems), 1)
-        TodoService.close(self.acme)
-        self.assertEqual(self.move(self.acme, "top")[0], [])   # a done todo stays where it is
+        self.assertEqual(self.move(self.acme, "top")[0][0].op, Op.MOVE)   # (a done todo can be moved: see DoneTodoTests)
 
     def test_a_meeting_is_not_moved_but_a_task_can_go_next_to_one(self):
         from django.utils import timezone
@@ -315,6 +314,71 @@ class ShowTheThreadTests(VoiceBase):
         applied = CommandService.apply(self.user, valid)
         self.assertIsNone(applied.show)
         self.assertEqual(len(applied.touched), 2)
+
+
+class DoneTodoTests(VoiceBase):
+    """Reopening done todos, and putting them in a new order."""
+
+    def setUp(self):
+        super().setUp()
+        self.flights = TodoService.create(self.user, TodoTitleSchema(title="Book flights"))
+        # an older one: closed yesterday, so it sits in the done list below the todos, not in the order
+        self.old = TodoService.create(self.user, TodoTitleSchema(title="Check Dubai flights"))
+        TodoService.close(self.old)
+        self.yesterday = timezone.now() - timedelta(days=1)
+        Todo.objects.filter(pk=self.old.pk).update(closed_at=self.yesterday)
+        TodoService.close(self.acme)   # done today: still in its place
+
+    def run_ops(self, *operations):
+        valid, problems = CommandService.validate(CommandService.todos_for(self.user), list(operations), CommandService.done_earlier(self.user))
+        return valid, problems, (CommandService.apply(self.user, valid) if valid else None)
+
+    def order(self):
+        return list(TodoService.ordered_for(self.user).values_list("title", flat=True))
+
+    def test_a_todo_done_today_reopens_where_it_stands_and_undo_closes_it_again(self):
+        before = self.order()
+        _, problems, applied = self.run_ops(Operation(Op.REOPEN, self.acme.id))
+        self.assertEqual((problems, applied.lines, applied.touched), ([], ["Reopened “Acme follow-up”"], [self.acme.id]))
+        self.assertIsNone(Todo.objects.get(pk=self.acme.id).closed_at)
+        self.assertEqual(self.order(), before)
+        CommandService.undo(VoiceCommand.objects.create(user=self.user, applied=applied.done, undo=applied.undo))
+        self.assertIsNotNone(Todo.objects.get(pk=self.acme.id).closed_at)
+
+    def test_an_older_done_todo_comes_back_at_the_end_and_undo_sends_it_back_to_the_done_list(self):
+        self.assertNotIn("Check Dubai flights", self.order())
+        _, _, applied = self.run_ops(Operation(Op.REOPEN, self.old.id))
+        self.assertEqual(self.order()[-1], "Check Dubai flights")
+        self.assertEqual(list(TodoService.ordered_for(self.user).values_list("position", flat=True)), list(range(1, 5)))
+        CommandService.undo(VoiceCommand.objects.create(user=self.user, applied=applied.done, undo=applied.undo))
+        back = Todo.objects.get(pk=self.old.pk)
+        self.assertEqual(back.closed_at, self.yesterday)
+        self.assertNotIn("Check Dubai flights", self.order())
+        self.assertEqual(list(TodoService.recently_closed(self.user, 10)), [back])
+
+    def test_only_a_done_task_can_be_reopened(self):
+        for operation in (Operation(Op.REOPEN, self.invoice.id), Operation(Op.REOPEN, 9999), Operation(Op.REOPEN)):
+            valid, problems, _ = self.run_ops(operation)
+            self.assertEqual((valid, len(problems)), ([], 1))
+
+    def test_a_done_todo_in_the_list_can_be_moved_like_any_other(self):
+        _, problems, applied = self.run_ops(Operation(Op.MOVE, self.acme.id, None, "bottom"))
+        self.assertEqual(problems, [])
+        self.assertEqual(self.order()[-1], "Acme follow-up")
+        _, _, _ = self.run_ops(Operation(Op.MOVE, self.acme.id, None, "before", self.invoice.id))
+        self.assertEqual(self.order()[:2], ["Acme follow-up", "Send invoice"])
+        self.assertIsNotNone(Todo.objects.get(pk=self.acme.id).closed_at)   # still done: it only changed places
+
+    def test_an_older_done_todo_is_not_in_the_order_so_it_cannot_be_moved_until_reopened(self):
+        valid, problems, _ = self.run_ops(Operation(Op.MOVE, self.old.id, None, "top"))
+        self.assertEqual((valid, len(problems)), ([], 1))
+
+    def test_the_model_is_shown_the_done_list_and_which_in_the_order_are_done(self):
+        todos = CommandService.todos_for(self.user)
+        prompt = DecisionService.build_body("reopen it", todos, [], "m", done_earlier=CommandService.done_earlier(self.user))["messages"][1]["content"]
+        self.assertIn(f"#{self.acme.id} [task, done] (number 1) Acme follow-up", prompt)
+        self.assertIn(f"Done earlier (only reopen applies):\n#{self.old.id} Check Dubai flights", prompt)
+        self.assertNotIn("Done earlier", DecisionService.build_body("hi", todos, [], "m")["messages"][1]["content"])
 
 
 class NavigationTests(VoiceBase):
@@ -465,6 +529,15 @@ class VoiceCommandViewTests(VoiceBase):
     def test_a_goodbye_ends_voice_mode(self):
         body = self.run_with("thank you", Decision([Operation(Op.END)])).json()
         self.assertEqual((body["go"], body["reply"]), ({"to": "end"}, "Closing voice mode"))
+
+    def test_reopening_by_voice_reaches_the_done_list_and_flags_the_row(self):
+        old = TodoService.create(self.user, TodoTitleSchema(title="Old one"))
+        TodoService.close(old)
+        Todo.objects.filter(pk=old.pk).update(closed_at=timezone.now() - timedelta(days=3))
+        body = self.run_with("reopen the old one", Decision([Operation(Op.REOPEN, old.id)])).json()
+        self.assertEqual((body["outcome"], body["reply"], body["touched"]), ("applied", "Reopened “Old one”", [old.id]))
+        self.assertEqual([t.id for t in self.decide.call_args.kwargs["done_earlier"]], [old.id])
+        self.assertIsNone(Todo.objects.get(pk=old.pk).closed_at)
 
     def test_the_thread_on_screen_and_the_notes_reach_the_model(self):
         Comment.objects.create(todo=self.invoice, body="Finance said Friday")

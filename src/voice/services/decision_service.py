@@ -21,6 +21,7 @@ Operations:
 - close: mark a todo done. todo_id = that todo, text null.
 - add_update: write a note on a todo's thread (a status, a fact, something that happened). todo_id = that todo, text = the note in their words.
 - move: change where a todo sits in the list. todo_id = the todo to move, and place says where: "top" or "bottom" (the ends), "before" or "after" (then anchor_id = the todo it goes just before or after), or "position" (then position = the number it should end up at, as the list shows its numbers). Set the other move fields to null. "Put X above Y" is before Y; "below Y" is after Y; "first" is top; "last" is bottom.
+- reopen: mark a done todo as not done again. todo_id = that todo: one marked done in the list, or one under "Done earlier". A todo done today is simply open again where it stands; an older one comes back at the end of the list.
 - open: take them somewhere on screen. target = "todo" (then todo_id = that todo: its thread opens), "all_todos" (the panel of every past and scheduled todo), "settings", "usage" (the settings page that shows what voice has cost: use it for any question about spending, cost, billing, balance or how much they have used) or "close_panel" (shut whatever panel is open). "Open", "show me", "go to", "pull up" all mean this.
 - edit_update: change a note on a thread. comment_id = that note (its [number] under the todo), text = the complete new text of the note.
 - delete_update: remove a note. comment_id = that note.
@@ -29,7 +30,8 @@ Operations:
 Rules:
 - What they said was typed by speech recognition, so it may have errors: "Toto" for "todo", "Acme Wan" for "Acme one", a name spelled oddly. Read it for what they meant, and match the closest todo when it is reasonably clear. Ask only when two or more todos fit equally well.
 - Use only the todo ids listed. Match by meaning ("the acme one" is "Acme follow-up"). Never invent an id.
-- Meetings can only get add_update, edit_update, delete_update and open. Closing, renaming or moving a meeting is not possible, though a task can be moved next to one.
+- Meetings can only get add_update, edit_update, delete_update and open. Closing, renaming, moving or reopening a meeting is not possible, though a task can be moved next to one.
+- A done todo that is still in the list (marked "done") can be moved like any other. Todos under "Done earlier" are not in the order: they can only be reopened (and then moved).
 - Notes are listed under their todo, newest first, as [number] "text". Use only those numbers. "The thread open on screen now" is where "this one", "my last note", "delete that comment" point when they don't name a todo. If several notes could be meant and nothing settles it, ask which instead of guessing.
 - One spoken command can hold several operations, in the order said.
 - If it is unclear which todo they mean, or there is nothing to do, return no operations and put one short question or remark in "reply" (under 15 words, plain, no greeting).
@@ -77,12 +79,14 @@ class DecisionService:
 
     @staticmethod
     def build_body(transcript: str, todos: list, history: list[dict] | None, model: str,
-                   notes: dict | None = None, open_id: int | None = None) -> dict:
+                   notes: dict | None = None, open_id: int | None = None, done_earlier: list | None = None) -> dict:
         def line(number, t):
             row = f'#{t.id} [{"meeting" if t.is_meeting else "task"}{", done" if t.closed_at else ""}] (number {number}) {t.title}'
             written = (notes or {}).get(t.id)
             return row + ("\n    notes: " + " · ".join(f'[{c_id}] "{body}"' for c_id, body in written) if written else "")
         listing = "\n".join(line(number, t) for number, t in enumerate(todos, 1)) or "(the list is empty)"
+        if done_earlier:
+            listing += "\n\nDone earlier (only reopen applies):\n" + "\n".join(f"#{t.id} {t.title}" for t in done_earlier)
         opened = next((t for t in todos if t.id == open_id), None)
         if opened:
             listing += f'\n\nThe thread open on screen now: #{opened.id} "{opened.title}"'
@@ -100,12 +104,12 @@ class DecisionService:
 
     @staticmethod
     def decide(transcript: str, todos: list, history: list[dict] | None = None, model: str = "",
-               notes: dict | None = None, open_id: int | None = None) -> tuple[Decision, int]:
+               notes: dict | None = None, open_id: int | None = None, done_earlier: list | None = None) -> tuple[Decision, int]:
         """What to do about `transcript` given the user's list (with each todo's latest notes, and the thread
         open on screen) and the conversation so far (a list of {"said", "did"}, oldest first), and how long
         the model took (ms)."""
         model = model or settings.VOICE_DECISION_MODEL
-        body = DecisionService.build_body(transcript, todos, history, model, notes, open_id)
+        body = DecisionService.build_body(transcript, todos, history, model, notes, open_id, done_earlier)
         request = urllib.request.Request(URL, data=json.dumps(body).encode(), method="POST", headers={
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
             "Content-Type": "application/json",

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from django.db import transaction
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from comments.models import Comment
 from comments.service import CommentService
@@ -18,6 +19,7 @@ CONVERSATION_MINUTES = 30
 TURNS_KEPT = 10
 NOTES_PER_TODO = 3      # the latest notes the model sees under each todo, so it can find "my last note"
 NOTES_IN_ALL = 120
+EARLIER_DONE = 10       # the done list Miller shows below the todos: the same ones, so "reopen that one" means what the screen shows
 
 OPENED = {Target.ALL_TODOS: "All todos", Target.SETTINGS: "Settings", Target.USAGE: "your voice usage"}
 
@@ -43,6 +45,11 @@ class CommandService:
     def todos_for(user) -> list[Todo]:
         """What the model may see and touch: the user's list as it stands today, tasks and meetings."""
         return list(TodoService.ordered_for(user))
+
+    @staticmethod
+    def done_earlier(user) -> list[Todo]:
+        """Todos done before today, as the screen's done list shows them: not in the order, but reopenable."""
+        return list(TodoService.recently_closed(user, EARLIER_DONE))
 
     @staticmethod
     def history(user, session: str) -> list[dict]:
@@ -73,10 +80,11 @@ class CommandService:
         return ("Todo list: " + "; ".join(t.title for t in todos))[:600]
 
     @staticmethod
-    def validate(todos: list[Todo], operations: list[Operation]) -> tuple[list[Operation], list[str]]:
+    def validate(todos: list[Todo], operations: list[Operation], done_earlier: list[Todo] | None = None) -> tuple[list[Operation], list[str]]:
         """Only operations on real todos, of the right kind, with sane text, and no more than the cap.
         Returns what passes and a note on each that doesn't."""
         by_id = {t.id: t for t in todos}
+        earlier = {t.id: t for t in done_earlier or []}
         wanted = {o.comment_id for o in operations if o.op in (Op.EDIT_UPDATE, Op.DELETE_UPDATE) and o.comment_id}
         notes = {c.id: c for c in Comment.objects.filter(pk__in=wanted, todo_id__in=by_id, automatic=False)} if wanted else {}
         valid, problems, closing, ended = [], [], set(), False
@@ -89,6 +97,11 @@ class CommandService:
             if operation.op == Op.CREATE:
                 if not text or len(text) > TITLE_MAX_LENGTH:
                     problems.append("a todo needs a title under 300 characters")
+                    continue
+            elif operation.op == Op.REOPEN:
+                todo = by_id.get(operation.todo_id) or earlier.get(operation.todo_id)
+                if todo is None or todo.is_meeting or not todo.closed_at:
+                    problems.append("a done todo to reopen")
                     continue
             elif operation.op == Op.END:
                 if ended:
@@ -141,8 +154,8 @@ class CommandService:
 
     @staticmethod
     def _move_problem(operation: Operation, todo: Todo, by_id: dict) -> str:
-        """Why a move can't be done, or "" if it can: a task, still open, put somewhere that exists."""
-        if todo.is_meeting or todo.closed_at:
+        """Why a move can't be done, or "" if it can: a task (done today or not), put somewhere that exists."""
+        if todo.is_meeting:
             return f"{quote(todo.title)} can't be moved"
         if operation.place in (Place.BEFORE, Place.AFTER):
             if operation.anchor_id not in by_id or operation.anchor_id == todo.id:
@@ -205,6 +218,11 @@ class CommandService:
                     result.lines.append(f"Noted on {quote(todo.title)}")
                     result.undo.append({"op": "delete_comment", "id": comment.id})
                     result.show, result.read, extra = todo.id, True, {"comment_id": comment.id}   # the thread opens on it, the new note at the foot
+                elif operation.op == Op.REOPEN:
+                    was = todo.closed_at
+                    TodoService.reopen(todo, TodoReopenSchema(index=TodoService.ordered_for(user).count() + 1, select=False))
+                    result.lines.append(f"Reopened {quote(todo.title)}")
+                    result.undo.append({"op": "restore_closed", "id": todo.id, "at": was.isoformat()})
                 elif operation.op == Op.MOVE:
                     before, now = CommandService._move(user, todo, operation)
                     result.lines.append(f"Moved {quote(todo.title)} to #{now}")
@@ -267,6 +285,8 @@ class CommandService:
                     TodoService.delete(todo)
             elif kind == "reopen":
                 TodoService.reopen(todo, TodoReopenSchema(index=step["index"], select=False))
+            elif kind == "restore_closed":
+                TodoService.restore_closed(todo, parse_datetime(step["at"]))
             elif kind == "rename":
                 TodoService.rename(todo, TodoTitleSchema(title=step["title"]))
         command.undone_at = timezone.now()

@@ -32,7 +32,7 @@
   .topbar__voice { display: none; }
   .voice .voice__live { right: 122px; }
   .toast, .notice { bottom: calc(86px + env(safe-area-inset-bottom)); }
-  body.voice-on .toast, body.voice-on .notice { bottom: calc(208px + env(safe-area-inset-bottom)); }
+  body.voice-on .toast, body.voice-on .notice { bottom: calc(var(--voice-h, 200px) + 8px); }
 }
 
 @media (prefers-reduced-motion: reduce) { .voice-fab { transition: none; } }

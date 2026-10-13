@@ -12,11 +12,12 @@ class Op:
     CLOSE      = "close"
     ADD_UPDATE = "add_update"
     MOVE       = "move"
+    REOPEN     = "reopen"          # a done todo, not done again
     OPEN       = "open"            # go somewhere on screen
     EDIT_UPDATE   = "edit_update"      # change a note on a thread
     DELETE_UPDATE = "delete_update"    # remove one
     END        = "end"             # they're finished: close voice mode
-    ALL = (CREATE, RENAME, CLOSE, ADD_UPDATE, MOVE, OPEN, EDIT_UPDATE, DELETE_UPDATE, END)
+    ALL = (CREATE, RENAME, CLOSE, ADD_UPDATE, MOVE, REOPEN, OPEN, EDIT_UPDATE, DELETE_UPDATE, END)
 
 
 class Target:

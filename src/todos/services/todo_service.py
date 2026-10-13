@@ -177,6 +177,15 @@ class TodoService:
 
     @staticmethod
     @transaction.atomic
+    def restore_closed(todo: Todo, closed_at) -> None:
+        """Closed again exactly as it was (taking back a reopen): the same time, so a todo that was done
+        before today goes back to the done list, not to today's."""
+        todo.closed_at = closed_at
+        todo.save(update_fields=["closed_at", "updated_at"])
+        TodoService._renumber(todo.user)
+
+    @staticmethod
+    @transaction.atomic
     def reorder(user, data) -> None:
         """Apply the order given (todos and today's meetings alike); any the client didn't mention keep
         their relative place at the end."""
