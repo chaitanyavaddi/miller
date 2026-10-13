@@ -15,7 +15,7 @@ class BusTests(TestCase):
     async def test_an_event_reaches_that_users_stream_and_no_one_elses(self):
         async with subscription(5) as mine, subscription(6) as theirs:
             deliver("5:meetings-changed")
-            self.assertEqual(await asyncio.wait_for(mine.get(), 1), "meetings-changed")
+            self.assertEqual(await asyncio.wait_for(mine.get(), 1), ("meetings-changed", "meetings-changed"))
             await asyncio.sleep(0.05)
             self.assertTrue(theirs.empty())
 
@@ -25,7 +25,13 @@ class BusTests(TestCase):
                 publish(5, "meetings-changed")
             send.assert_not_called()      # not before the change is saved…
             callbacks[0]()
-            send.assert_called_once_with(5, "meetings-changed")  # …then at once
+            send.assert_called_once_with(5, "meetings-changed", None)  # …then at once
+
+
+    async def test_an_event_can_carry_data(self):
+        async with subscription(5) as mine:
+            deliver('5:voice-result:{"reply":"Done: 1"}')
+            self.assertEqual(await asyncio.wait_for(mine.get(), 1), ("voice-result", '{"reply":"Done: 1"}'))
 
 
 class ListenerTests(TestCase):
@@ -55,7 +61,7 @@ class ListenerTests(TestCase):
         with self.settings(DATABASES={"default": db}), patch("psycopg.AsyncConnection.connect", side_effect=connect):
             bus._listener = None
             async with subscription(5) as queue:
-                self.assertEqual(await asyncio.wait_for(queue.get(), 1), "meetings-changed")
+                self.assertEqual(await asyncio.wait_for(queue.get(), 1), ("meetings-changed", "meetings-changed"))
             bus._listener.cancel()
             bus._listener = None
         self.assertEqual(executed, ["LISTEN miller_events"])

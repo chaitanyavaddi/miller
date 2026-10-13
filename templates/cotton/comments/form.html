@@ -7,7 +7,7 @@
     {# Grows with what's typed (or said): Enter sends, Shift+Enter starts a new line; past a few lines it scrolls (comments.js). #}
     <div class="composer composer--multiline" id="composer">
       <span class="composer__plus" aria-hidden="true">+</span>
-      <textarea class="composer__input" id="comment-input" name="body" rows="1" data-todo-id="{{ todo_id }}" aria-label="New update" placeholder="Add an update" autocomplete="off" {% if focus or data %}autofocus{% endif %}>{{ data.body|default:'' }}</textarea>
+      <textarea class="composer__input" id="comment-input" name="body" rows="1" data-todo-id="{{ todo_id }}" aria-label="New update" placeholder="Add an update" autocomplete="off" enterkeyhint="send" {% if focus or data %}autofocus{% endif %}>{{ data.body|default:'' }}</textarea>
       {% if recorder.voice_url %}
       {# Say it instead (a minute at most): the words land here, to edit before sending (recorder.js). Always shown; Send waits for text. #}
       <button type="button" class="composer__mic" data-voice data-voice-url="{{ recorder.voice_url }}" data-todo-id="{{ todo_id }}" aria-label="Say it" title="Say it"><c-ui.icon name="mic" size="14" sw="1.6" /></button>

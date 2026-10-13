@@ -1,4 +1,4 @@
-<c-vars user zones current_zone connections providers notice="" />
+<c-vars user zones current_zone connections providers notice="" usage="" open_group="" />
 {% comment %}Settings, in All todos' frame: numbered sections that fold. Each row names a setting and says
 what it does on the left; its value, and the way to change it, sit on the right. All start folded
 (Meetings opens on the way back from connecting a calendar); open ones stay open across saves (main.js).{% endcomment %}
@@ -29,6 +29,25 @@ what it does on the left; its value, and the way to change it, sit on the right.
           </form>
         </div>
       </details>
+
+      {% if usage %}
+      <details class="settings__group" data-group="usage"{% if open_group == "usage" %} open{% endif %}>
+        <summary class="settings__summary"><h2 class="eyebrow settings__heading">AI usage</h2><c-ui.icon name="chevron" size="13" class="settings__chevron" /></summary>
+        <div class="settings__row settings__row--top">
+          <div class="settings__about">
+            <p class="settings__label">Voice</p>
+            <p class="settings__hint">What speaking to Miller has cost: turning your words into text, and working out what to do. {% if user.is_guest %}A guest gets {{ usage.limit }} to try it.{% else %}You have {{ usage.limit }} for now.{% endif %}</p>
+          </div>
+          <div class="settings__control settings__control--stack">
+            <div class="usage{% if usage.full %} usage--full{% endif %}" role="meter" aria-label="Voice spending" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ usage.percent }}" aria-valuetext="{{ usage.spent }} of {{ usage.limit }}">
+              <div class="usage__bar"><i style="width: {{ usage.percent }}%"></i></div>
+              <p class="usage__text"><span>{{ usage.spent }} of {{ usage.limit }}</span><span>{{ usage.commands }} command{{ usage.commands|pluralize }}</span></p>
+              <p class="usage__text usage__text--quiet"><span>{% if usage.full %}Limit reached{% else %}{{ usage.left }} left{% endif %}</span></p>
+            </div>
+          </div>
+        </div>
+      </details>
+      {% endif %}
 
       <details class="settings__group" data-group="calendars"{% if notice %} open{% endif %}>
         <summary class="settings__summary"><h2 class="eyebrow settings__heading">Meetings</h2><c-ui.icon name="chevron" size="13" class="settings__chevron" /></summary>

@@ -13,13 +13,13 @@ TEMPLATE = "board.settings"
 
 
 class SettingsResponseMixin:
-    def render_settings(self, notice=""):
-        return render_fragment(self.request, TEMPLATE, SettingsService.build(self.request.user, notice))
+    def render_settings(self, notice="", open_group=""):
+        return render_fragment(self.request, TEMPLATE, SettingsService.build(self.request.user, notice, open_group))
 
 
 class SettingsView(SignedInRequiredMixin, SettingsResponseMixin, View):
     def get(self, request):
-        return self.render_settings(request.session.pop(NOTICE_KEY, ""))
+        return self.render_settings(request.session.pop(NOTICE_KEY, ""), request.GET.get("open", ""))  # ?open=usage: that section unfolded
 
 
 class SettingsTimezoneView(SignedInRequiredMixin, SettingsResponseMixin, View):

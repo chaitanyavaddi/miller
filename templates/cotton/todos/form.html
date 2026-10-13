@@ -4,7 +4,8 @@
   <form class="composer" hx-post="{% url 'board:todo-create' %}" hx-include="#board-state" hx-target="#todo-form" hx-swap="outerHTML">
     {% csrf_token %}
     <span class="composer__plus" aria-hidden="true">+</span>
-    <input type="text" id="new-title" class="composer__input" name="title" aria-label="New todo" maxlength="300" placeholder="Add a todo" autocomplete="off" required value="{{ data.title|default:'' }}" aria-keyshortcuts="n" {% if data %}autofocus{% endif %}>
-    <span class="composer__hint">↵ Add</span>
+    <input type="text" id="new-title" class="composer__input" name="title" aria-label="New todo" maxlength="300" placeholder="Add a todo" autocomplete="off" required value="{{ data.title|default:'' }}" aria-keyshortcuts="n" enterkeyhint="send" {% if data %}autofocus{% endif %}>
+    {# A real button: on a phone there is no Enter key to look for, and this is what you tap. #}
+    <button type="submit" class="composer__hint" aria-label="Add todo">↵ Add</button>
   </form>
 </div>

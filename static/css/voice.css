@@ -1,0 +1,104 @@
+/* — voice mode: always listening. The add-todo box and the composer give way to a quiet centre at the foot
+     of the screen: your words, Miller's answer, and a line of hairline bars that moves with your voice.
+     Everything above it stays as it was (scrolls, opens, drags) and simply fades out toward the bottom. — */
+:root { --voice-glow-rgb: 38, 37, 30; }   /* the light's colour: Miller's ink. A warm tint to try instead: 196, 128, 84 */
+
+.topbar__voice[aria-pressed="true"] { color: var(--text); background: rgba(38, 37, 30, 0.07); }
+
+body.voice-on .todo-form,
+body.voice-on .comment-form,
+body.voice-on .thread__empty-sub { display: none; }
+body.voice-on .page { padding-bottom: 200px; }
+html:has(body.voice-on) { scroll-padding-bottom: 230px; }  /* anything scrolled into view lands above the bar, not under it */
+body.voice-on .notice { bottom: 208px; }
+
+/* The fade is only paint: clicks and scrolling pass straight through to the list underneath. */
+.voice { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; height: 220px; pointer-events: none;
+  background: linear-gradient(to top, var(--bg) 0, var(--bg) 26%, rgba(247, 247, 244, 0.85) 46%, rgba(247, 247, 244, 0) 100%);
+  animation: voice-in 0.3s ease; }
+.voice[hidden] { display: none; }
+@keyframes voice-in { from { opacity: 0; } to { opacity: 1; } }
+
+.voice__stage { position: absolute; left: 50%; bottom: 50px; transform: translateX(-50%); width: min(640px, calc(100% - 48px));
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.voice__heard, .voice__reply { margin: 0; max-width: 100%; }
+.voice__heard { font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voice__reply { font-size: 16px; line-height: 24px; letter-spacing: -0.01em; color: var(--text); }
+.voice__heard:empty, .voice__reply:empty { display: none; }
+.voice__heard.is-new, .voice__reply.is-new { animation: voice-text 0.35s ease; }
+@keyframes voice-text { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+.voice__level { display: block; width: 220px; height: 28px; margin-top: 8px; }
+
+.voice__foot { position: absolute; left: 24px; right: 24px; bottom: 14px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }
+.voice__hint { text-transform: uppercase; letter-spacing: 0.06em; }
+.voice__usage { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--text-4); }
+.voice__usage-bar { width: 36px; height: 2px; flex: none; background: var(--border); border-radius: 1px; overflow: hidden; }
+.voice__usage-bar i { display: block; height: 100%; min-width: 2px; background: var(--text-3); transition: width 0.4s ease; }
+.voice__usage.usage--full .voice__usage-bar i { background: var(--st-blocked); }
+.voice__usage-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.voice__actions { justify-self: end; display: inline-flex; gap: 16px; pointer-events: auto; }
+.voice__btn { font: inherit; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; padding: 0; background: none; border: none; cursor: pointer; }
+.voice__btn:hover { color: var(--text); }
+.voice__btn[hidden] { display: none; }
+
+@media (max-width: 640px) { .voice__foot { left: 16px; right: 16px; } }
+@media (prefers-reduced-motion: reduce) { .voice, .voice__heard.is-new, .voice__reply.is-new { animation: none; } }
+
+/* — the screen is in voice control: a hairline round the window, a half-circle of light floating behind the
+     words, and a dot where the controls are, so it's plain at a glance that the microphone is on. Ink, never a
+     colour, and nothing travels: the half-circle only floats a few pixels, and its light rises a little with
+     your voice (--voice-level, set by voice.js). While Miller works it breathes more slowly; as a command
+     lands it lifts once. — */
+.voice__edge { position: fixed; inset: 0; pointer-events: none; border: 1px solid rgba(var(--voice-glow-rgb), 0.12);
+  transition: border-color 0.4s ease; }
+.voice[data-state="listening"] .voice__edge { border-color: rgba(var(--voice-glow-rgb), calc(0.10 + var(--voice-level, 0) * 0.12)); }
+
+/* A semicircle, 260px of radius, centred on the foot of the screen and sitting a little below it so its float
+   never shows a gap. Its edge is soft: a gradient from the middle out to nothing. */
+.voice__glow { --voice-r: 260px; position: absolute; left: 50%; bottom: -8px; width: calc(var(--voice-r) * 2); height: var(--voice-r); margin-left: calc(var(--voice-r) * -1); pointer-events: none;
+  background: radial-gradient(circle var(--voice-r) at 50% 100%,
+    rgba(var(--voice-glow-rgb), calc(0.09 + var(--voice-level, 0) * 0.07)) 0%,
+    rgba(var(--voice-glow-rgb), calc(0.05 + var(--voice-level, 0) * 0.04)) 50%,
+    rgba(var(--voice-glow-rgb), 0) 100%);
+  animation: voice-float 7s ease-in-out infinite; }
+.voice[data-state="thinking"] .voice__glow { animation: voice-wait 1.8s ease-in-out infinite; }
+.voice.is-done .voice__glow { animation: voice-lift 1s ease-out; }
+@keyframes voice-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes voice-wait { 0%, 100% { opacity: 0.65; } 50% { opacity: 1; } }
+@keyframes voice-lift { 0% { opacity: 1; } 35% { opacity: 1.7; } 100% { opacity: 1; } }
+@media (max-width: 640px) { .voice__glow { --voice-r: 190px; } }
+
+.voice__live { position: fixed; top: 43px; right: 188px; width: 6px; height: 6px; border-radius: 50%; pointer-events: none;
+  background: rgb(var(--voice-glow-rgb)); animation: voice-dot 2.4s ease-in-out infinite; }
+.voice[data-state="thinking"] .voice__live { animation-duration: 0.9s; }
+@keyframes voice-dot { 0%, 100% { opacity: 0.25; transform: scale(0.85); } 50% { opacity: 0.9; transform: scale(1); } }
+@media (max-width: 760px) { .voice__live { top: 35px; right: 176px; } }
+@media (prefers-reduced-motion: reduce) {
+  .voice__glow, .voice.is-done .voice__glow, .voice[data-state="thinking"] .voice__glow, .voice__live { animation: none; }
+  .voice__live { opacity: 0.7; }
+}
+
+/* — usage: what voice has cost against its limit. A hairline bar, the way the rest of Settings draws things. — */
+.usage { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.usage__bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.usage__bar i { display: block; height: 100%; min-width: 2px; background: var(--text); border-radius: 2px; transition: width 0.4s ease; }
+.usage--full .usage__bar i { background: var(--st-blocked); }
+.usage__text { margin: 0; display: flex; justify-content: space-between; gap: 12px; font-family: var(--font-mono); font-size: 11px; color: var(--text-2); }
+.usage__text--quiet { color: var(--text-4); }
+
+/* — phones: no Esc key to name, targets a thumb can hit, room for the home bar, the footer kept to one line — */
+@media (hover: none) {
+  .voice__esc { display: none; }
+  .voice__btn { padding: 12px 4px; min-height: 44px; }
+  .voice__foot { bottom: calc(6px + env(safe-area-inset-bottom)); }
+  .voice__stage { bottom: calc(52px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 480px) {
+  .voice__foot { grid-template-columns: auto 1fr auto; column-gap: 12px; }
+  .voice__hint { text-align: center; }
+  .voice__usage-bar { width: 24px; }
+  .voice__reply { font-size: 15px; line-height: 22px; }
+  .voice__heard { font-size: 11px; white-space: normal; max-height: 32px; }
+  .voice__level { width: 180px; }
+}

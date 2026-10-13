@@ -12,5 +12,6 @@ urlpatterns = [
     path("", include("calendars.urls")),
     path("", include("scheduled.urls")),
     path("", include("recordings.urls")),
+    path("", include("voice.urls")),
     path("", include("live.urls")),
 ]

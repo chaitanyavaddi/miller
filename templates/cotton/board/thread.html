@@ -3,7 +3,7 @@
 {% if current %}
   <div class="pane-bar">
     {% if current.is_meeting %}
-    <span class="thread__crumb"><b class="thread__crumb-strong">Meeting</b>{% if current.span %} · {{ current.span }}{% endif %}</span>
+    <span class="thread__crumb"><button type="button" class="thread__back" data-action="thread-back" aria-label="Back to todos"><span aria-hidden="true">‹</span> Todos</button><b class="thread__crumb-strong">Meeting</b>{% if current.span %} · {{ current.span }}{% endif %}</span>
     <span class="thread__actions">
       {% if recorder.call_url %}
       {# A meeting that's on: record its call (the mic, and the call's tab). recorder.js runs it; its state shows below. #}
@@ -21,7 +21,7 @@
       {% endif %}
     </span>
     {% else %}
-    <span class="thread__crumb">{% if current.is_done %}<b class="thread__crumb-strong">Done today</b>{% else %}<b class="thread__crumb-strong">#{{ current.position }} today</b>{% endif %}{% if current.schedule_label %} · {{ current.schedule_label }}{% elif current.from_schedule %} · from scheduled{% endif %}{% if current.shows_age %} · {{ current.added }}{% endif %}</span>
+    <span class="thread__crumb"><button type="button" class="thread__back" data-action="thread-back" aria-label="Back to todos"><span aria-hidden="true">‹</span> Todos</button>{% if current.is_done %}<b class="thread__crumb-strong">Done today</b>{% else %}<b class="thread__crumb-strong">#{{ current.position }} today</b>{% endif %}{% if current.schedule_label %} · {{ current.schedule_label }}{% elif current.from_schedule %} · from scheduled{% endif %}{% if current.shows_age %} · {{ current.added }}{% endif %}</span>
     <span class="thread__actions">
       {% if current.is_done %}
       <c-ui.text-button class="text-btn--small thread__done-btn" hx-post="{% url 'board:todo-reopen' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML">Mark not done</c-ui.text-button>

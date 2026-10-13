@@ -5,6 +5,7 @@ web process (and comes from the worker too); each web process keeps one LISTEN c
 events to its open streams for that user. Elsewhere (SQLite in dev and tests) it's delivered within the
 process. A page's stream is /events/ (live.views)."""
 import asyncio
+import json
 import logging
 from contextlib import asynccontextmanager
 
@@ -25,13 +26,15 @@ def on_postgres() -> bool:
     return settings.DATABASES["default"]["ENGINE"].endswith("postgresql")
 
 
-def publish(user_id: int, name: str) -> None:
-    """Tell the user's open pages that `name` happened (e.g. "meetings-changed"), once this is saved."""
-    transaction.on_commit(lambda: _send(user_id, name))
+def publish(user_id: int, name: str, data: dict | None = None) -> None:
+    """Tell the user's open pages that `name` happened (e.g. "meetings-changed"), once this is saved.
+    `data` rides along as JSON for events that carry something (a voice reply); keep it small, as a
+    Postgres NOTIFY holds under 8000 bytes."""
+    transaction.on_commit(lambda: _send(user_id, name, data))
 
 
-def _send(user_id: int, name: str) -> None:
-    payload = f"{user_id}:{name}"
+def _send(user_id: int, name: str, data: dict | None = None) -> None:
+    payload = f"{user_id}:{name}:{json.dumps(data, separators=(',', ':'))}" if data else f"{user_id}:{name}"
     if on_postgres():
         with connection.cursor() as cursor:
             cursor.execute("SELECT pg_notify(%s, %s)", [CHANNEL, payload])
@@ -41,26 +44,27 @@ def _send(user_id: int, name: str) -> None:
 
 def deliver(payload: str) -> None:
     """Hand an event to this process's open streams for its user. Safe from any thread."""
-    user, _, name = payload.partition(":")
+    user, _, rest = payload.partition(":")
+    name, _, data = rest.partition(":")
     queues = _subscribers.get(int(user)) if user.isdigit() else None
     if not queues or _loop is None or _loop.is_closed():
         return
     for queue in list(queues):
-        _loop.call_soon_threadsafe(_offer, queue, name)
+        _loop.call_soon_threadsafe(_offer, queue, (name, data or name))
 
 
-def _offer(queue: asyncio.Queue, name: str) -> None:
+def _offer(queue: asyncio.Queue, event: tuple[str, str]) -> None:
     if not queue.full():  # a stream far behind gets the next one; it only ever needs "something changed"
-        queue.put_nowait(name)
+        queue.put_nowait(event)
 
 
 @asynccontextmanager
 async def subscription(user_id: int):
-    """A queue of this user's events, for as long as a page's stream is open."""
+    """A queue of this user's events, as (name, data), for as long as a page's stream is open."""
     global _loop
     _loop = asyncio.get_running_loop()
     _ensure_listener()
-    queue: asyncio.Queue = asyncio.Queue(maxsize=20)
+    queue: asyncio.Queue = asyncio.Queue(maxsize=50)
     _subscribers.setdefault(user_id, set()).add(queue)
     try:
         yield queue

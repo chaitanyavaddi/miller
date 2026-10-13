@@ -3,6 +3,7 @@ from django.conf import settings
 from accounts.schemas import zone_names
 from calendars.models import CalendarConnection
 from calendars.services import CalendarService
+from voice.services.voice_service import VoiceService
 
 
 # Providers offered in Settings. Outlook works end to end but stays hidden until it's set up and verified.
@@ -13,7 +14,7 @@ class SettingsService:
     """Read model for the settings modal: the user's zone and their connected calendars."""
 
     @staticmethod
-    def build(user, notice: str = "") -> dict:
+    def build(user, notice: str = "", open_group: str = "") -> dict:
         providers = [
             (value, label) for value, label in CalendarConnection.Provider.choices
             if value in OFFERED_PROVIDERS and CalendarService.can_connect(value)
@@ -25,4 +26,6 @@ class SettingsService:
             "connections":  list(CalendarService.connections_for(user)),
             "providers":    providers,
             "notice":       notice,
+            "usage":        VoiceService.usage(user) if VoiceService.is_available(user) else None,   # what voice has cost, against the limit
+            "open_group":   open_group,
         }

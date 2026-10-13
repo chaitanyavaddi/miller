@@ -22,11 +22,11 @@ async def events(request):
             yield "retry: 3000\n\n"
             while True:
                 try:
-                    name = await asyncio.wait_for(queue.get(), timeout=HEARTBEAT)
+                    name, data = await asyncio.wait_for(queue.get(), timeout=HEARTBEAT)
                 except TimeoutError:
                     yield ": ping\n\n"
                     continue
-                yield f"event: {name}\ndata: {name}\n\n"
+                yield f"event: {name}\ndata: {data}\n\n"
 
     response = StreamingHttpResponse(stream(), content_type="text/event-stream")
     response["Cache-Control"] = "no-cache"

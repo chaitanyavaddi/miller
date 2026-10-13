@@ -18,6 +18,7 @@ INSTALLED_APPS = [
     "calendars",
     "scheduled",
     "recordings",
+    "voice",
     "jobs",
     "live",
     "board",
@@ -76,6 +77,18 @@ CALENDAR_TOKEN_KEY = env("CALENDAR_TOKEN_KEY", "")
 # Recordings are transcribed by Groq's Whisper; without a key, nothing is (and Record isn't offered).
 GROQ_API_KEY = env("GROQ_API_KEY", "")
 GROQ_MODEL = env("GROQ_MODEL", "whisper-large-v3")  # or whisper-large-v3-turbo: cheaper, a little less accurate
+
+# Voice mode: what's said is turned into todo changes by a model on OpenRouter. Change VOICE_DECISION_MODEL
+# any time (any OpenRouter slug that supports structured output); without a key, voice mode isn't offered.
+OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", "")
+VOICE_DECISION_MODEL = env("VOICE_DECISION_MODEL", "anthropic/claude-haiku-5.5")
+# Each command's cost is recorded (OpenRouter reports the model's; the speech is priced at Groq's rate per hour
+# of audio, with its 10-second minimum per request). Each person may spend this much in all, in USD, then voice
+# stops until it's raised. Settings shows what's been spent.
+VOICE_GUEST_BUDGET_USD = env("VOICE_GUEST_BUDGET_USD", "1.00")
+VOICE_MEMBER_BUDGET_USD = env("VOICE_MEMBER_BUDGET_USD", "1.00")
+GROQ_COST_PER_HOUR = env("GROQ_COST_PER_HOUR", "0.111")  # whisper-large-v3; 0.04 for -turbo
+GROQ_MIN_BILLED_SECONDS = 10
 
 # Background jobs: django-q2, its queue and schedules in the database (no Redis). The cluster runs as its
 # own process: `python manage.py qcluster`. Recurring jobs are listed in jobs/schedules.py.

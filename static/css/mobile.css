@@ -1,0 +1,38 @@
+/* — phones: one pane at a time. The list of todos is the home screen; touching a todo opens it on its thread, with
+     a way back; and at the foot of the screen, where a thumb rests, one clean button for voice, which is how
+     most people on a phone will use Miller. (todos.js keeps `mobile-thread` on <body> while a thread is open.) — */
+.thread__back, .voice-fab { display: none; }
+
+@media (max-width: 760px) {
+  .board { row-gap: 0; }
+  body:not(.mobile-thread) #thread { display: none; }
+  body.mobile-thread #list { display: none; }
+
+  /* Room under the content for the voice button. Voice mode (voice.css) makes its own, larger. */
+  .page { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+
+  .todo-row__main { min-height: 48px; }   /* a row is a target a thumb can hit */
+
+  /* Back to the list: a mono "‹ Todos" where the thread's label starts, its tap area larger than it looks. */
+  .thread__back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin: -12px 10px -12px -10px; padding: 0 10px;
+    background: none; border: none; cursor: pointer; font: inherit; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text); }
+  .thread__back:active { color: var(--text-4); }
+  .thread__crumb { display: inline-flex; align-items: center; min-width: 0; white-space: nowrap; }
+  .thread__crumb-strong { text-overflow: ellipsis; overflow: hidden; }
+
+  /* The voice button: the page's one dark control, floating at the foot, centred. */
+  .voice-fab { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 18;
+    display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 24px 0 20px; border: none; border-radius: 26px; cursor: pointer;
+    background: var(--text); color: var(--bg); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    box-shadow: 0 8px 24px rgba(38, 37, 30, 0.18); -webkit-tap-highlight-color: transparent; transition: transform 0.12s ease; }
+  .voice-fab:active { transform: translateX(-50%) scale(0.96); }
+  body.voice-on .voice-fab { display: none; }   /* voice mode has its own bar */
+
+  /* The top bar's mic is the button above, so it steps aside; notices rise clear of the button. */
+  .topbar__voice { display: none; }
+  .voice .voice__live { right: 122px; }
+  .toast, .notice { bottom: calc(86px + env(safe-area-inset-bottom)); }
+  body.voice-on .toast, body.voice-on .notice { bottom: calc(208px + env(safe-area-inset-bottom)); }
+}
+
+@media (prefers-reduced-motion: reduce) { .voice-fab { transition: none; } }

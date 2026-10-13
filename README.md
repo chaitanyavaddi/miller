@@ -14,7 +14,7 @@ django-q2 (background jobs) · uvicorn (async web, for live updates).
 uv sync                                   # install
 cp .env.example .env.dev                  # then fill it in (see Environment)
 uv run python manage.py migrate
-DJANGO_SETTINGS_MODULE=config.settings.dev uv run uvicorn config.asgi:application --reload --port 8000
+DJANGO_SETTINGS_MODULE=config.settings.dev uv run uvicorn config.asgi:application --reload --timeout-graceful-shutdown 1 --port 8000
 uv run python manage.py qcluster          # second terminal: background jobs
 ```
 
@@ -36,6 +36,10 @@ Settings: `config/settings/dev.py` (reads `.env.dev`) and `prod.py` (reads real 
 | `CALENDAR_TOKEN_KEY` | calendars | Encrypts calendar tokens. Make once, **never change** (everyone would have to reconnect):<br>`uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 | `GROQ_API_KEY` | voice notes, call recordings | Groq console. |
 | `GROQ_MODEL` | optional | `whisper-large-v3` (default) or `whisper-large-v3-turbo` (cheaper). |
+| `OPENROUTER_API_KEY` | voice mode | OpenRouter key. Without it (or Groq's), voice mode isn't offered. |
+| `VOICE_GUEST_BUDGET_USD` / `VOICE_MEMBER_BUDGET_USD` | optional | What each person may spend on voice in all, in USD (default `1.00` each). Their spend shows in Settings → AI usage and in voice mode's footer. `uv run python manage.py voice_spend` lists it per user. |
+| `GROQ_COST_PER_HOUR` | optional | Speech is priced at this rate for the usage figure: `0.111` (whisper-large-v3, default) or `0.04` (turbo). |
+| `VOICE_DECISION_MODEL` | optional | Any OpenRouter slug that supports structured output. Default `anthropic/claude-haiku-5.5`; change it any time, no code change. |
 | `MICROSOFT_CLIENT_ID` / `_SECRET` | optional | Outlook calendars. Built, but hidden in Settings (`OFFERED_PROVIDERS` in `board/services/settings_service.py`). |
 | `DB_NAME` `DB_USER` `DB_PASSWORD` `DB_HOST` `DB_PORT` `DB_SSLMODE` | prod | Postgres. `DB_SSLMODE` defaults to `require`. |
 | `ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS` | prod | Comma-separated, e.g. `miller.so` / `https://miller.so`. |
@@ -122,6 +126,7 @@ In Dokploy, run these from the app's Terminal without `uv run`.
 | `calendars` | calendar connections, Google/Graph clients, webhook, sync |
 | `scheduled` | repeating items, Move to… |
 | `recordings` | call recordings, voice notes, Groq |
+| `voice` | voice mode: a spoken command → todo changes (model on OpenRouter), logged and undoable |
 | `live` | the event bus and `/events/` stream |
 | `jobs` | the list of recurring jobs |
 
@@ -136,6 +141,7 @@ Templates: `templates/` (pages) and `templates/cotton/` (components). CSS/JS: `s
 | Meetings don't update | `calendar_status`; logs for `POST /calendars/webhook/google/` and `[Q] … Sync calendar`. |
 | Page doesn't update live | logs for `Live events listener lost Postgres`; is uvicorn running (not runserver)? |
 | Jobs never run | logs for `Q Cluster … running`. |
+| Voice mode missing, or no replies | both `GROQ_API_KEY` and `OPENROUTER_API_KEY` set? Replies stream over `/events/`, so it needs uvicorn too. `VoiceCommand` rows hold each transcript, the model's answer and timings. |
 | Transcription fails | `GROQ_API_KEY`; recording's `error` field; Groq error 1010 = missing User-Agent. |
 | Calendar "Lost access" | user revoked or token expired: Reconnect in Settings. If everyone: was `CALENDAR_TOKEN_KEY` changed? |
 | Google sign-in "redirect_uri_mismatch" | add the exact URI to the OAuth client. |

@@ -1,0 +1,26 @@
+<c-vars limited="" usage="" limit_message="" />
+<div class="voice" id="voice" data-state="listening" data-command-url="{% url 'voice:command' %}" data-undo-url="{% url 'voice:undo' 0 %}"
+     data-review-url="{% url 'board:review' %}" data-settings-url="{% url 'board:settings' %}" data-limit-message="{{ limit_message }}"
+     data-limited="{% if limited %}1{% endif %}" role="region" aria-label="Voice mode" hidden>
+  <div class="voice__edge" aria-hidden="true"></div>
+  <div class="voice__glow" aria-hidden="true"></div>
+  <span class="voice__live" title="Microphone is on" aria-hidden="true"></span>
+  <div class="voice__stage">
+    <p class="voice__heard" id="voice-heard" aria-live="off"></p>
+    <p class="voice__reply" id="voice-reply" role="status" aria-live="polite"></p>
+    <canvas class="voice__level" aria-hidden="true"></canvas>
+  </div>
+  <div class="voice__foot">
+    <span class="voice__usage{% if usage.full %} usage--full{% endif %}" id="voice-usage" title="What voice has cost so far, of what you have">
+      <span class="voice__usage-bar"><i style="width: {{ usage.percent|default:0 }}%"></i></span>
+      <span class="voice__usage-text" id="voice-usage-text">{{ usage.spent }} of {{ usage.limit }}</span>
+    </span>
+    <span class="voice__hint" id="voice-hint">Listening</span>
+    <span class="voice__actions">
+      <button type="button" class="voice__btn" id="voice-undo" hidden>Undo</button>
+      <button type="button" class="voice__btn" data-action="voice-toggle">Exit<span class="voice__esc"> · Esc</span></button>
+    </span>
+  </div>
+</div>
+{# On a phone, where people mostly speak: one clean button at the foot of the screen (mobile.css). #}
+<button type="button" class="voice-fab" data-action="voice-toggle" aria-label="Start voice mode"><c-ui.icon name="mic" size="18" sw="1.8" /><span>Voice</span></button>

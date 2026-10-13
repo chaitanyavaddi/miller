@@ -115,6 +115,28 @@
 
   /* — snapping: every row slides from where it was to where it lands (FLIP), and the placed todo
    *   settles with a brief tint. Skipped for people who ask for less motion. — */
+  /* — phones: one pane at a time. The list is home; a todo opens on its thread (`mobile-thread` on <body>, see
+   *   mobile.css), and "‹ Todos" comes back to the list where it was left. — */
+  const phone = window.matchMedia('(max-width: 760px)');
+  let listScroll = 0;
+
+  function showThread(on) {
+    if (!phone.matches || document.body.classList.contains('mobile-thread') === on) return;
+    if (on) listScroll = window.scrollY;
+    document.body.classList.toggle('mobile-thread', on);
+    window.scrollTo(0, on ? 0 : listScroll);
+  }
+
+  document.addEventListener('click', e => {
+    if (!phone.matches) return;
+    if (e.target.closest('.todo-row__main')) showThread(true);
+    else if (e.target.closest('[data-action="thread-back"]')) showThread(false);
+    /* Done or deleted from the thread: back to the list, which is where that todo has just gone from. */
+    else if (e.target.closest('.thread [hx-post*="/close/"], .thread [hx-post*="/delete/"]')) showThread(false);
+  });
+  /* The browser's own Back, from a thread, goes to the list. */
+  window.addEventListener('popstate', () => { if (document.body.classList.contains('mobile-thread')) showThread(false); });
+
   const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
   const SNAP = { duration: 240, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' };
 
@@ -282,13 +304,69 @@
     reloadBoard();
   }
 
+  /* A change that says what it did (a voice command): which todo's thread to open, which rows to light.
+   * The board reloads as for any live change, but remembers where every row stood, so afterwards each
+   * one slides from there to where it landed, as it does when you drag, and the thread opens on the note. */
+  let hint = null;
+  const rowTops = () => new Map([...document.querySelectorAll('#rows .todo-row')].map(el => [el.dataset.id, el.getBoundingClientRect().top]));
+
+  function todosChanged(e) {
+    let data = null;
+    try { data = JSON.parse(e.detail && e.detail.data); } catch (_) { /* a plain "something changed" */ }
+    if (data && typeof data === 'object') {
+      hint = { show: data.show || (hint && hint.show) || null, touched: [...new Set([...(hint ? hint.touched : []), ...(data.touched || [])])] };
+      /* On a phone, show where it happened: a note, in its thread; anything else (a move, a todo added or closed), in the list. */
+      if (data.read) showThread(true);
+      else if ((data.touched || []).length) showThread(false);
+      const selected = document.querySelector('#board-state [name=t]');
+      if (hint.show && selected) selected.value = hint.show;  /* the reload brings back that todo's thread */
+    }
+    liveChanged();
+  }
+
+  function settle(before, play) {
+    const rowsNow = [...document.querySelectorAll('#rows .todo-row')];
+    if (!calm.matches) {
+      rowsNow.forEach(el => {
+        const was = before.get(el.dataset.id);
+        if (was === undefined) { el.animate([{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'none' }], SNAP); return; }
+        const shift = was - el.getBoundingClientRect().top;
+        /* a longer trip takes a little longer, so the eye can follow it */
+        if (Math.abs(shift) >= 1) el.animate([{ transform: `translateY(${shift}px)` }, { transform: 'none' }], { ...SNAP, duration: Math.min(560, SNAP.duration + Math.abs(shift) * 0.4) });
+      });
+      (play.touched || []).forEach(id => {
+        const el = document.querySelector(`#rows .todo-row[data-id="${id}"]`);
+        if (el) el.animate([{ backgroundColor: 'rgba(38, 37, 30, 0.06)' }, { backgroundColor: 'transparent' }], { duration: 700, easing: 'ease-out' });
+      });
+    }
+    if (!play.show) return;
+    const thread = document.querySelector('.thread__comments');
+    if (!thread) return;
+    thread.scrollTop = thread.scrollHeight;  /* the newest note is at the foot */
+    const last = thread.querySelector('.comment:last-child');
+    if (last) last.scrollIntoView({ block: 'nearest', behavior: calm.matches ? 'auto' : 'smooth' });  /* and the page, where the thread sits below the list */
+    const stamp = last && last.querySelector('time') && Date.parse(last.querySelector('time').getAttribute('datetime'));
+    if (last && !calm.matches && stamp && Date.now() - stamp < 20000) {
+      last.animate([{ backgroundColor: 'rgba(38, 37, 30, 0.06)' }, { backgroundColor: 'transparent' }], { duration: 1200, easing: 'ease-out' });
+    }
+  }
+
   function reloadBoard() {
     if (document.activeElement?.id === 'comment-input') {  /* the cursor was in the composer: it's back there after */
       document.addEventListener('htmx:after:swap', () => document.getElementById('comment-input')?.focus(), { once: true });
     }
+    const play = hint;
+    hint = null;
+    if (play) {
+      const before = rowTops();
+      const run = () => settle(before, play);
+      document.addEventListener('htmx:after:swap', run, { once: true });
+      setTimeout(() => document.removeEventListener('htmx:after:swap', run), 4000);  /* the reload never came: don't catch a later swap */
+    }
     document.body.dispatchEvent(new Event('board-changed'));
   }
   document.addEventListener('meetings-changed', liveChanged, true);
+  document.addEventListener('todos-changed', todosChanged, true);  /* a voice command changed the list */
   setInterval(() => { if (pendingLive) liveChanged(); }, 1500);
 
   checkMeetings();

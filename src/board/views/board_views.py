@@ -10,6 +10,7 @@ from board.mixins import BoardResponseMixin
 from board.services import BoardService
 from todos.models import Todo
 from todos.services import TodoService
+from voice.services.voice_service import VoiceService
 from utils.view_helper import redirect_to
 
 
@@ -25,7 +26,13 @@ class HomeView(View):
 @method_decorator(ensure_csrf_cookie, name="dispatch")
 class BoardView(GuestSessionMixin, BoardResponseMixin, View):
     def get(self, request):
-        return render(request, "board/index.html", BoardService.workspace(request.user, self.selected_id()))
+        context = BoardService.workspace(request.user, self.selected_id())
+        context["voice"] = VoiceService.is_available(request.user)
+        if context["voice"]:
+            context["voice_usage"] = VoiceService.usage(request.user)
+            context["voice_limited"] = context["voice_usage"]["full"]
+            context["voice_limit_message"] = VoiceService.limit_message(request.user)
+        return render(request, "board/index.html", context)
 
 
 class BoardWorkspaceView(SignedInRequiredMixin, BoardResponseMixin, View):

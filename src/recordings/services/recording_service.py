@@ -65,15 +65,27 @@ class RecordingService:
         return Recording.objects.filter(todo_id=todo_id, kind=Recording.Kind.CALL, status=Recording.Status.READY).exclude(transcript=[])
 
     @staticmethod
-    def words(audio: bytes) -> str:
-        """A short voice note, said into a composer: its words, now. Nothing is kept."""
+    def words(audio: bytes, prompt: str = "") -> str:
+        """A short voice note, said into a composer: its words, now. Nothing is kept. `prompt`: words to expect."""
         import tempfile
         from pathlib import Path
         from recordings.services.groq_service import GroqService
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "voice.webm"
             path.write_bytes(audio)
-            return " ".join(segment["text"] for segment in GroqService.transcribe(path)).strip()
+            return " ".join(segment["text"] for segment in GroqService.transcribe(path, prompt)).strip()
+
+    @staticmethod
+    def listen(audio: bytes, prompt: str = "", suffix: str = ".webm") -> tuple[str, float]:
+        """`words`, and the seconds of audio it was (for its cost). `suffix` is the recording's format."""
+        import tempfile
+        from pathlib import Path
+        from recordings.services.groq_service import GroqService
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / f"voice{suffix}"
+            path.write_bytes(audio)
+            segments, seconds = GroqService.transcribe_timed(path, prompt)
+            return " ".join(segment["text"] for segment in segments).strip(), seconds
 
     @staticmethod
     def start(user, todo) -> tuple[Recording, dict]:
