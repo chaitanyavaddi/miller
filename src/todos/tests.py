@@ -4,9 +4,9 @@ from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
 from accounts.services import IdentityService
-from todos.models import PositionDay, Todo
+from todos.models import Todo
 from todos.schemas import TodoReopenSchema, TodoReorderSchema, TodoTitleSchema
-from todos.services import PositionHistoryService, TodoService
+from todos.services import TodoService
 
 
 class TodoServiceTests(TestCase):
@@ -49,34 +49,6 @@ class TodoServiceTests(TestCase):
         TodoService.transfer(self.user, other)
         self.assertEqual([title for title, _ in TodoService.open_for(other).values_list("title", "position")],
                          ["theirs", "todo 1", "todo 2", "todo 3"])
-
-
-class PositionHistoryTests(TestCase):
-    def setUp(self):
-        self.user = IdentityService.create_user("a@x.com")
-        self.todos = [TodoService.create(self.user, TodoTitleSchema(title=f"todo {i}")) for i in (1, 2, 3)]
-
-    def test_reorder_records_every_todos_position_for_today(self):
-        TodoService.reorder(self.user, TodoReorderSchema(ids=[t.id for t in reversed(self.todos)]))
-        recorded = {d.todo.title: d.position for d in PositionDay.objects.all()}
-        self.assertEqual(recorded, {"todo 3": 1, "todo 2": 2, "todo 1": 3})
-
-    def test_an_undo_overwrites_the_days_record(self):
-        TodoService.delete(self.todos[0])
-        self.assertEqual(PositionDay.objects.get(todo=self.todos[1]).position, 1)
-        TodoService.reopen(Todo.objects.get(pk=self.todos[0].pk), TodoReopenSchema(index=1, select=False))
-        self.assertEqual(PositionDay.objects.get(todo=self.todos[1]).position, 2)
-        self.assertEqual(PositionDay.objects.count(), 3)
-
-    def test_journey_carries_a_position_across_quiet_days(self):
-        todo = self.todos[0]
-        today = timezone.localdate()
-        Todo.objects.filter(pk=todo.pk).update(created_at=timezone.now() - timedelta(days=3))
-        todo.days.all().delete()
-        PositionDay.objects.create(todo=todo, day=today - timedelta(days=3), position=5)
-        PositionDay.objects.create(todo=todo, day=today - timedelta(days=1), position=2)
-        todo.refresh_from_db()
-        self.assertEqual([p for _, p in PositionHistoryService.journey(todo)], [5, 5, 2, 2])
 
 
 class ReviewQueryTests(TestCase):

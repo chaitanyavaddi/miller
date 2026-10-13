@@ -6,7 +6,6 @@ from django.db.models import F, Max, Q, QuerySet
 from django.utils import timezone
 
 from todos.models import Todo
-from todos.services.history_service import PositionHistoryService
 
 
 @dataclass(frozen=True)
@@ -211,4 +210,3 @@ class TodoService:
         for position, todo in enumerate(todos, 1):
             todo.position = position
         Todo.objects.bulk_update(todos, ["position"])
-        PositionHistoryService.snapshot(todos)
