@@ -38,6 +38,7 @@ Settings: `config/settings/dev.py` (reads `.env.dev`) and `prod.py` (reads real 
 | `GROQ_MODEL` | optional | `whisper-large-v3` (default) or `whisper-large-v3-turbo` (cheaper). |
 | `OPENROUTER_API_KEY` | voice mode | OpenRouter key. Without it (or Groq's), voice mode isn't offered. |
 | `VOICE_GUEST_BUDGET_USD` / `VOICE_MEMBER_BUDGET_USD` | optional | What each person may spend on voice in all, in USD (default `1.00` each). Their spend shows in Settings → AI usage and in voice mode's footer. `uv run python manage.py voice_spend` lists it per user. |
+| `ADMIN_URL` | prod | Where the admin lives (default `admin/`). In production set something nobody would guess, e.g. `ops-8f3k2/`. |
 | `GROQ_COST_PER_HOUR` | optional | Speech is priced at this rate for the usage figure: `0.111` (whisper-large-v3, default) or `0.04` (turbo). |
 | `VOICE_DECISION_MODEL` | optional | Any OpenRouter slug that supports structured output. Default `anthropic/claude-haiku-5.5`; change it any time, no code change. |
 | `MICROSOFT_CLIENT_ID` / `_SECRET` | optional | Outlook calendars. Built, but hidden in Settings (`OFFERED_PROVIDERS` in `board/services/settings_service.py`). |
@@ -131,6 +132,26 @@ In Dokploy, run these from the app's Terminal without `uv run`.
 | `jobs` | the list of recurring jobs |
 
 Templates: `templates/` (pages) and `templates/cotton/` (components). CSS/JS: `static/`.
+
+---
+
+## Admin: who uses Miller, what they do, what's going wrong
+
+A read-only Django admin at `/<ADMIN_URL>` (`staff/`). There are no passwords: you sign in with Google as always, and an account flagged as staff is let through.
+
+```
+# once, on the server (a container shell): let yourself in. If you haven't signed in yet, this makes the account.
+python manage.py make_staff you@company.com        # --revoke takes it away
+```
+Then sign in with Google and open the admin's address.
+
+- **Front page:** people, who was active (24h / 7d / 30d), todos and voice in the last day, and links to whatever is failing.
+- **Usage report** (`/<ADMIN_URL>usage/`): voice outcomes, failure rate, how long answers take, spend, a day-by-day table and the biggest spenders.
+- **Users:** each person's counts (todos, open, voice, spend) with their latest todos and what they said; filter guests and staff.
+- **Todos, notes:** every todo with its thread; filter open, done or deleted; search by words or email.
+- **Voice commands:** what was said, what the model asked for (as JSON), what was done, how long each stage took and what it cost. Filter failed, slow (2s, 4s, 8s) or by model.
+- **Recordings, calendars, jobs:** how they're getting on (state, attempts, errors) for debugging. Call transcripts, calendar tokens and uploaded files are never shown.
+- Everything is **read-only** (to change data, use a shell, where it leaves a trace). The background-job tables are Django-Q's own.
 
 ---
 

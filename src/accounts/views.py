@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.shortcuts import render
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.urls import reverse
 from django.views import View
 
@@ -52,9 +53,13 @@ class GoogleCallbackView(View):
         if IdentityService.is_disabled(profile.email):
             return self._fail(request, "This account is disabled.")
 
+        # Read before signing in, which can start a new session: the admin asks to be returned to.
+        after = request.session.pop("next_after_login", "")
         guest = request.user if request.user.is_authenticated else None
         user = IdentityService.claim(guest, profile)
         IdentityService.sign_in(request, user)
+        if after and url_has_allowed_host_and_scheme(after, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+            return redirect_to(request, after)
         return redirect_to(request, "board:index")
 
     @staticmethod

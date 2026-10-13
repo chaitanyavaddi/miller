@@ -26,6 +26,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.email
 
     @property
+    def is_staff(self) -> bool:
+        """Who may use the admin (django.contrib.admin asks for this): the people flagged with `manage.py make_staff`,
+        which sets is_superuser. Staff and superuser are the same thing here."""
+        return self.is_superuser
+
+    @property
     def display_name(self):
         if self.is_guest:
             return f"Guest {self.email.removeprefix('guest-')[:6]}"

@@ -1,0 +1,43 @@
+{% extends "admin/index.html" %}
+{% comment %}The admin's front page, with how Miller is being used at the top and what to look at first when something is wrong.{% endcomment %}
+{% block content %}
+{% with h=headline %}
+<div class="module" style="margin-bottom:20px">
+  <table style="width:100%">
+    <style>.module th[scope=row]{white-space:nowrap;width:1%}</style>
+    <caption>Right now <a href="{% url 'admin:usage' %}" style="float:right;text-transform:none">Full usage report →</a></caption>
+    <tr>
+      <th scope="row">People</th>
+      <td>{{ h.people.members }} member{{ h.people.members|pluralize }} · {{ h.people.guests }} guest{{ h.people.guests|pluralize }} · {{ h.people.new_24h }} new in 24h, {{ h.people.new_7d }} in 7 days</td>
+    </tr>
+    <tr>
+      <th scope="row">Active</th>
+      <td>
+        24h: {{ h.people.active.24h.members }} members, {{ h.people.active.24h.guests }} guests ·
+        7d: {{ h.people.active.7d.members }} + {{ h.people.active.7d.guests }} ·
+        30d: {{ h.people.active.30d.members }} + {{ h.people.active.30d.guests }}
+      </td>
+    </tr>
+    <tr>
+      <th scope="row">Todos</th>
+      <td>{{ h.todos_today }} added in the last 24h</td>
+    </tr>
+    <tr>
+      <th scope="row">Voice (24h)</th>
+      <td>{{ h.voice.total }} commands from {{ h.voice.users }} people · {{ h.voice.failed }} failed · {{ h.voice.spend }} spent ({{ h.spend_total }} in all)</td>
+    </tr>
+    <tr>
+      <th scope="row">Look at</th>
+      <td>
+        {% if h.problems.voice_failed_24h %}<a href="{{ h.problems.voice_failed_url }}">{{ h.problems.voice_failed_24h }} failed voice command{{ h.problems.voice_failed_24h|pluralize }}</a> · {% endif %}
+        {% if h.problems.jobs_failed_24h %}<a href="{{ h.problems.jobs_url }}">{{ h.problems.jobs_failed_24h }} failed job{{ h.problems.jobs_failed_24h|pluralize }}</a> · {% endif %}
+        {% if h.problems.recordings_failed %}<a href="{{ h.problems.recordings_url }}">{{ h.problems.recordings_failed }} failed recording{{ h.problems.recordings_failed|pluralize }}</a> · {% endif %}
+        {% if h.problems.calendars_lost %}<a href="{{ h.problems.calendars_url }}">{{ h.problems.calendars_lost }} calendar{{ h.problems.calendars_lost|pluralize }} that lost access</a>{% endif %}
+        {% if not h.problems.voice_failed_24h and not h.problems.jobs_failed_24h and not h.problems.recordings_failed and not h.problems.calendars_lost %}Nothing is failing.{% endif %}
+      </td>
+    </tr>
+  </table>
+</div>
+{% endwith %}
+{{ block.super }}
+{% endblock %}

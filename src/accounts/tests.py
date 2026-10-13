@@ -65,8 +65,11 @@ class GuestSessionTests(TestCase):
 
 class LoginTests(TestCase):
     def test_there_are_no_password_routes(self):
-        for path in ("/signup/", "/forgot-password/", "/admin/"):
+        for path in ("/signup/", "/forgot-password/"):
             self.assertEqual(self.client.get(path).status_code, 404)
+        # The admin has no password form either: its login is Google's (see staff/).
+        response = self.client.get("/admin/login/")
+        self.assertEqual((response.status_code, response["Location"]), (302, reverse("accounts:login")))
 
     @override_settings(GOOGLE_CLIENT_ID="id", GOOGLE_CLIENT_SECRET="secret")
     def test_google_start_issues_state_and_redirects(self):

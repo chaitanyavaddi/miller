@@ -10,6 +10,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "staff.apps.MillerAdminConfig",   # Django's admin as Miller's own site: see staff/
     "django.contrib.staticfiles",
     "rules.apps.AutodiscoverRulesConfig",
     "accounts",
@@ -105,6 +106,9 @@ Q_CLUSTER = {
     "label":        "Jobs",
 }
 SITE_URL = env("SITE_URL", "http://localhost:8000").rstrip("/")
+# Where the admin lives. Set it to something nobody would guess in production (ADMIN_URL=ops-8f3k2/); getting in takes a
+# Google sign-in on an account flagged with `manage.py make_staff`, so this is one lock of two.
+ADMIN_URL = env("ADMIN_URL", "admin/").strip("/") + "/"
 
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 365  # a guest's identity is this cookie
 

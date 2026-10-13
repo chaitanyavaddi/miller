@@ -1,0 +1,58 @@
+{% extends "admin/base_site.html" %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Home</a> › Usage</div>{% endblock %}
+{% block content %}
+{% with r=report %}
+<div class="module" style="margin-bottom:20px">
+  <table style="width:100%"><caption>People</caption>
+    <thead><tr><th></th><th>Members</th><th>Guests</th></tr></thead>
+    <tr><th scope="row">Signed up in all</th><td>{{ r.people.members }}</td><td>{{ r.people.guests }}</td></tr>
+    <tr><th scope="row">Active in the last 24 hours</th><td>{{ r.people.active.24h.members }}</td><td>{{ r.people.active.24h.guests }}</td></tr>
+    <tr><th scope="row">Active in the last 7 days</th><td>{{ r.people.active.7d.members }}</td><td>{{ r.people.active.7d.guests }}</td></tr>
+    <tr><th scope="row">Active in the last 30 days</th><td>{{ r.people.active.30d.members }}</td><td>{{ r.people.active.30d.guests }}</td></tr>
+  </table>
+  <p class="help" style="padding:8px 12px">Active: touched a todo, wrote a note, or spoke to Miller. New: {{ r.people.new_24h }} in 24h, {{ r.people.new_7d }} in 7 days.</p>
+</div>
+
+<div class="module" style="margin-bottom:20px">
+  <table style="width:100%"><caption>Voice, last {{ r.voice.days }} days</caption>
+    <tr><th scope="row">Commands</th><td>{{ r.voice.total }} from {{ r.voice.users }} people</td></tr>
+    <tr><th scope="row">What came of them</th><td>{% for outcome, n in r.voice.outcomes.items %}{{ outcome }}: {{ n }}{% if not forloop.last %} · {% endif %}{% empty %}–{% endfor %}</td></tr>
+    <tr><th scope="row">Failure rate</th><td>{{ r.voice.failure_rate }}</td></tr>
+    <tr><th scope="row">Time to answer</th><td>median {{ r.voice.p50 }} ms · slowest 1 in 20 over {{ r.voice.p95 }} ms</td></tr>
+    <tr><th scope="row">Spend</th><td>{{ r.voice.spend }} ({{ r.voice.per_command }} per command) · {{ r.spend_total }} in all</td></tr>
+    <tr><th scope="row">Models</th><td>{% for m in r.voice.models %}{{ m.model }}: {{ m.n }}{% if not forloop.last %} · {% endif %}{% empty %}–{% endfor %}</td></tr>
+  </table>
+</div>
+
+<div class="module" style="margin-bottom:20px">
+  <table style="width:100%"><caption>Problems</caption>
+    <tr><th scope="row">Failed voice commands, 24h</th><td>{% if r.problems.voice_failed_url %}<a href="{{ r.problems.voice_failed_url }}">{{ r.problems.voice_failed_24h }}</a>{% else %}{{ r.problems.voice_failed_24h }}{% endif %}</td></tr>
+    <tr><th scope="row">Failed background jobs, 24h</th><td>{% if r.problems.jobs_url %}<a href="{{ r.problems.jobs_url }}">{{ r.problems.jobs_failed_24h }}</a>{% else %}{{ r.problems.jobs_failed_24h }}{% endif %}</td></tr>
+    <tr><th scope="row">Failed recordings</th><td>{% if r.problems.recordings_url %}<a href="{{ r.problems.recordings_url }}">{{ r.problems.recordings_failed }}</a>{% else %}{{ r.problems.recordings_failed }}{% endif %}</td></tr>
+    <tr><th scope="row">Calendars that lost access</th><td>{% if r.problems.calendars_url %}<a href="{{ r.problems.calendars_url }}">{{ r.problems.calendars_lost }}</a>{% else %}{{ r.problems.calendars_lost }}{% endif %}</td></tr>
+  </table>
+  {% if r.failures %}
+  <table style="width:100%"><caption>Latest failed voice commands</caption>
+    <thead><tr><th>When</th><th>Who</th><th>They said</th><th>Miller said</th></tr></thead>
+    {% for f in r.failures %}<tr><td><a href="{{ f.url }}">{{ f.when|date:"M j H:i" }}</a></td><td>{{ f.user }}</td><td>{{ f.said|default:"–" }}</td><td>{{ f.reply }}</td></tr>{% endfor %}
+  </table>
+  {% endif %}
+</div>
+
+<div class="module" style="margin-bottom:20px">
+  <table style="width:100%"><caption>Day by day, last 30 days</caption>
+    <thead><tr><th>Day</th><th>New people</th><th>Todos added</th><th>Todos done</th><th>Voice commands</th><th>Failed</th><th>Voice spend</th></tr></thead>
+    {% for d in r.daily %}<tr><td>{{ d.day|date:"D, M j" }}</td><td>{{ d.new_users }}</td><td>{{ d.todos }}</td><td>{{ d.closed }}</td><td>{{ d.voice }}</td><td>{{ d.failed }}</td><td>{{ d.spend }}</td></tr>
+    {% empty %}<tr><td colspan="7">Nothing yet.</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="module">
+  <table style="width:100%"><caption>Who has spent the most on voice</caption>
+    <thead><tr><th>Person</th><th>Commands</th><th>Spent</th></tr></thead>
+    {% for s in r.spenders %}<tr><td>{% if s.url %}<a href="{{ s.url }}">{{ s.email }}</a>{% else %}{{ s.email }}{% endif %}{% if s.guest %} (guest){% endif %}</td><td>{{ s.commands }}</td><td>{{ s.spent }}</td></tr>
+    {% empty %}<tr><td colspan="3">No voice commands yet.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endwith %}
+{% endblock %}
