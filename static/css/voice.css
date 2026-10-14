@@ -1,91 +1,122 @@
-/* — voice mode: always listening. The add-todo box and the composer give way to a quiet centre at the foot
-     of the screen: your words, Miller's answer, and a line of hairline bars that moves with your voice.
-     Everything above it stays as it was (scrolls, opens, drags) and simply fades out toward the bottom. — */
-:root { --voice-glow-rgb: 38, 37, 30; }   /* the light's colour: Miller's ink. A warm tint to try instead: 196, 128, 84 */
-
-.topbar__voice[aria-pressed="true"] { color: var(--text); background: rgba(38, 37, 30, 0.07); }
+/* — voice mode. A mic in the top bar, before "All todos", is the way in and the way out (on a phone, a button at the foot of the screen). Turn it
+     on and the typing boxes give way: your words and Miller's answer appear in a soft ring of light that grows with
+     them, standing at the foot of the screen. Everything above stays as it was (scrolls, opens, drags) and fades out toward the
+     bottom. Ink, never a colour; the only movement is the light rising with your voice. — */
+:root { --voice-glow-rgb: 38, 37, 30; --dock-zone: 44px; }   /* the room kept clear at the bottom: small, as the mic is up in the top bar */   /* the light's colour: Miller's ink. A warm tint to try instead: 196, 128, 84 */
 
 body.voice-on .todo-form,
 body.voice-on .comment-form,
 body.voice-on .thread__empty-sub { display: none; }
-body.voice-on .page { padding-bottom: calc(var(--voice-h, 200px) + 8px); }   /* --voice-h: the bar's height as it is now (voice.js) */
-html:has(body.voice-on) { scroll-padding-bottom: calc(var(--voice-h, 200px) + 24px); }  /* anything scrolled into view lands above the bar, not under it */
-body.voice-on .notice { bottom: calc(var(--voice-h, 200px) + 8px); }
+body.voice-on .page { padding-bottom: calc(var(--voice-h, 220px) + 8px); }   /* --voice-h: the bar's height as it is now (voice.js) */
+html:has(body.voice-on) { scroll-padding-bottom: calc(var(--voice-h, 220px) + 24px); }  /* anything scrolled into view lands above the bar, not under it */
+body.voice-on .notice { bottom: calc(var(--voice-h, 220px) + 8px); }
 
-/* The bar is as tall as what is in it: a long transcript or reply makes it grow upward, never out of its own
-   backdrop. The top 72px is the fade (paint only: clicks and scrolling pass through to the list underneath);
-   below that the page colour is solid, so words never land on the list. */
-.voice { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; pointer-events: none; max-height: 60vh;
-  display: flex; flex-direction: column; align-items: center; padding: 72px 24px calc(14px + env(safe-area-inset-bottom));
+/* ——— the mic, in the top bar ——— */
+/* It never rests with the rest of the bar (main.css). On, it's a tinted button with a square (stop) and a ring that follows your voice. */
+.topbar__voice .topbar__voice-stop { display: none; width: 12px; height: 12px; border-radius: 3px; background: currentColor; }
+.topbar__voice[aria-pressed="true"] { color: var(--text); background: rgba(38, 37, 30, 0.07);
+  box-shadow: 0 0 0 calc(2px + var(--voice-level, 0) * 9px) rgba(var(--voice-glow-rgb), 0.08); }
+.topbar__voice[aria-pressed="true"] svg { display: none; }
+.topbar__voice[aria-pressed="true"] .topbar__voice-stop { display: block; }
+body:has(.voice[data-state="thinking"]) .topbar__voice[aria-pressed="true"] { animation: voice-dock-wait 1.6s ease-in-out infinite; }
+@media (max-width: 760px) { .topbar__voice { display: none; } }   /* a phone has the button at the foot instead */
+
+/* ——— the mic at the foot of the screen: phones only ——— */
+@media (min-width: 761px) { body .voice-dock { display: none; } }   /* (body: so it outranks the button's own rules below) */
+
+
+/* At the foot of the screen, in the middle: over the gap between the two columns, level with the update box. */
+.voice-dock { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 30;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 52px; height: 52px; padding: 0; border: none; border-radius: 26px; cursor: pointer;
+  background: var(--bg); color: var(--text-2); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  box-shadow: inset 0 0 0 1px rgba(38, 37, 30, 0.2), 0 4px 14px rgba(38, 37, 30, 0.05); -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease; }
+.voice-dock:hover { color: var(--text); background: rgba(38, 37, 30, 0.035); box-shadow: inset 0 0 0 1px rgba(38, 37, 30, 0.45), 0 6px 18px rgba(38, 37, 30, 0.07); }
+.voice-dock:active { transform: translateX(-50%) scale(0.96); }
+.voice-dock:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.voice-dock__label, .voice-dock__stop { display: none; }
+/* A modal open over a quiet page: the mic steps aside until it's closed. */
+body:has(#overlay > .overlay):not(.voice-on) .voice-dock { opacity: 0; pointer-events: none; }
+
+/* On: the mic becomes the way to stop. A firmer outline, a small square, and a ring that follows your voice. */
+body.voice-on .voice-dock { color: var(--text); background: var(--bg); width: 52px; padding: 0;
+  box-shadow: inset 0 0 0 1.5px var(--text), 0 0 0 calc(3px + var(--voice-level, 0) * 12px) rgba(var(--voice-glow-rgb), 0.08); }
+body.voice-on .voice-dock .icon, body.voice-on .voice-dock svg { display: none; }
+body.voice-on .voice-dock__stop { display: block; width: 14px; height: 14px; border-radius: 3px; background: currentColor; }
+body.voice-on .voice-dock__label { display: none; }
+/* While it works on what you said, the ring breathes: no words needed. */
+.voice[data-state="thinking"] ~ .voice-dock { animation: voice-dock-wait 1.6s ease-in-out infinite; }
+@keyframes voice-dock-wait {
+  0%, 100% { box-shadow: inset 0 0 0 1.5px var(--text), 0 0 0 3px rgba(var(--voice-glow-rgb), 0.06); }
+  50%      { box-shadow: inset 0 0 0 1.5px var(--text), 0 0 0 10px rgba(var(--voice-glow-rgb), 0.10); }
+}
+
+/* ——— the bar: as tall as what is in it ——— */
+/* A long transcript or reply makes it grow upward, never out of its own backdrop. The top 72px is the fade (paint
+   only: clicks and scrolling pass through to the list underneath); below that the page colour is solid, so words
+   never land on the list. The foot is left clear for the mic. */
+.voice { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; pointer-events: none; max-height: 70vh;
+  display: flex; flex-direction: column; align-items: center; padding: 72px 24px calc(var(--dock-zone) + env(safe-area-inset-bottom));
   background: linear-gradient(to bottom, rgba(247, 247, 244, 0) 0, rgba(247, 247, 244, 0.92) 56px, var(--bg) 84px);
   animation: voice-in 0.3s ease; }
 .voice[hidden] { display: none; }
 @keyframes voice-in { from { opacity: 0; } to { opacity: 1; } }
 
-.voice__stage { position: relative; flex: 0 1 auto; min-height: 40px; min-width: 0; width: min(640px, 100%); margin-bottom: 14px; overflow: hidden;
+.voice__stage { position: relative; flex: 0 1 auto; min-height: 44px; min-width: 0; width: min(560px, 100%); overflow: hidden;
   display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
 .voice__heard, .voice__reply { margin: 0; max-width: 100%; overflow-wrap: anywhere; }
-/* Long words wrap and stop at a few lines, ending in an ellipsis, instead of growing without end. */
-.voice__heard { font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-4);
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
-.voice__reply { font-size: 16px; line-height: 24px; letter-spacing: -0.01em; color: var(--text);
+/* What you said: small, in mono, in quotes, quiet. What Miller says: a size up and a shade softer than the page's own text, balanced across its lines so none is left
+   hanging, one change to a line. Long words wrap and stop at a few lines, ending in an ellipsis. */
+.voice__heard { font-family: var(--font-mono); font-size: 11.5px; line-height: 17px; letter-spacing: 0.01em; color: var(--text-4);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-wrap: balance; }
+.voice__reply { font-size: 15px; line-height: 23px; font-weight: 400; letter-spacing: -0.01em; color: var(--text-2); white-space: pre-line; text-wrap: balance;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; line-clamp: 5; overflow: hidden; }
 .voice__heard:empty, .voice__reply:empty { display: none; }
-.voice__heard.is-new, .voice__reply.is-new { animation: voice-text 0.35s ease; }
-@keyframes voice-text { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
-.voice__level { display: block; flex: none; width: 220px; height: 28px; margin-top: 8px; }
+.voice__heard.is-new, .voice__reply.is-new { animation: voice-text 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes voice-text { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 
-.voice__foot { position: relative; flex: none; width: 100%; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
-  font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }
-.voice__hint { text-transform: uppercase; letter-spacing: 0.06em; }
-.voice__usage { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--text-4); }
-.voice__usage-bar { width: 36px; height: 2px; flex: none; background: var(--border); border-radius: 1px; overflow: hidden; }
-.voice__usage-bar i { display: block; height: 100%; min-width: 2px; background: var(--text-3); transition: width 0.4s ease; }
-.voice__usage.usage--full .voice__usage-bar i { background: var(--st-blocked); }
-.voice__usage-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.voice__actions { justify-self: end; display: inline-flex; gap: 16px; pointer-events: auto; }
-.voice__btn { font: inherit; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; padding: 0; background: none; border: none; cursor: pointer; }
-.voice__btn:hover { color: var(--text); }
-.voice__btn[hidden] { display: none; }
+/* The one quiet line under the words, only when there is something to say: Undo, what's left of the budget, a state
+   that needs a word (Tap anywhere to start, Microphone blocked). Otherwise it isn't there. */
+.voice__meta { margin: 4px 0 0; display: flex; align-items: center; justify-content: center; gap: 14px; min-height: 16px;
+  font-family: var(--font-mono); font-size: 11px; line-height: 16px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-4); }
+.voice__meta[hidden] { display: none; }
+.voice__hint:empty { display: none; }
+.voice__undo { pointer-events: auto; padding: 0; background: none; border: none; cursor: pointer; font: inherit; letter-spacing: inherit; text-transform: inherit;
+  color: var(--text-3); text-decoration: underline dotted; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.voice__undo:hover { color: var(--text); }
+.voice__undo[hidden] { display: none; }
 
-@media (max-width: 640px) { .voice { padding-left: 16px; padding-right: 16px; } }
-@media (prefers-reduced-motion: reduce) { .voice, .voice__heard.is-new, .voice__reply.is-new { animation: none; } }
+/* ——— the ring of light ——— */
+/* An arch standing on the mic, around the words: clear in the middle where the words are, a ring of light just
+   outside them, nothing beyond. voice.js sizes it to the words, so a longer answer makes a bigger arch (it eases
+   there), and its light rises a little with your voice (--voice-level). */
+.voice__arc { position: absolute; left: 50%; bottom: calc(var(--dock-zone) - 40px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  width: var(--arc-w, 560px); height: var(--arc-h, 240px); pointer-events: none;
+  background: radial-gradient(ellipse 50% 100% at 50% 100%,
+    rgba(var(--voice-glow-rgb), 0) 0%, rgba(var(--voice-glow-rgb), 0) 66%,
+    rgba(var(--voice-glow-rgb), calc(0.08 + var(--voice-level, 0) * 0.08)) 85%,
+    rgba(var(--voice-glow-rgb), 0) 100%);
+  -webkit-mask-image: linear-gradient(to top, transparent 0, #000 38%); mask-image: linear-gradient(to top, transparent 0, #000 38%);   /* its feet fade out, not end */
+  transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: voice-breathe 7s ease-in-out infinite; }
+.voice[data-state="thinking"] .voice__arc { animation: voice-wait 1.8s ease-in-out infinite; }
+.voice.is-done .voice__arc { animation: voice-lift 1s ease-out; }
+@keyframes voice-breathe { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
+@keyframes voice-wait { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+@keyframes voice-lift { 0% { opacity: 1; } 35% { opacity: 1.8; } 100% { opacity: 1; } }
 
-/* — the screen is in voice control: a hairline round the window, a half-circle of light floating behind the
-     words, and a dot where the controls are, so it's plain at a glance that the microphone is on. Ink, never a
-     colour, and nothing travels: the half-circle only floats a few pixels, and its light rises a little with
-     your voice (--voice-level, set by voice.js). While Miller works it breathes more slowly; as a command
-     lands it lifts once. — */
-.voice__edge { position: fixed; inset: 0; pointer-events: none; border: 1px solid rgba(var(--voice-glow-rgb), 0.12);
-  transition: border-color 0.4s ease; }
+/* A hairline round the window: the page is under voice control. */
+.voice__edge { position: fixed; inset: 0; pointer-events: none; border: 1px solid rgba(var(--voice-glow-rgb), 0.12); transition: border-color 0.4s ease; }
 .voice[data-state="listening"] .voice__edge { border-color: rgba(var(--voice-glow-rgb), calc(0.10 + var(--voice-level, 0) * 0.12)); }
 
-/* A semicircle, 260px of radius, centred on the foot of the screen and sitting a little below it so its float
-   never shows a gap. Its edge is soft: a gradient from the middle out to nothing. */
-.voice__glow { --voice-r: 260px; position: absolute; left: 50%; bottom: -8px; width: calc(var(--voice-r) * 2); height: var(--voice-r); margin-left: calc(var(--voice-r) * -1); pointer-events: none;
-  background: radial-gradient(circle var(--voice-r) at 50% 100%,
-    rgba(var(--voice-glow-rgb), calc(0.09 + var(--voice-level, 0) * 0.07)) 0%,
-    rgba(var(--voice-glow-rgb), calc(0.05 + var(--voice-level, 0) * 0.04)) 50%,
-    rgba(var(--voice-glow-rgb), 0) 100%);
-  animation: voice-float 7s ease-in-out infinite; }
-.voice[data-state="thinking"] .voice__glow { animation: voice-wait 1.8s ease-in-out infinite; }
-.voice.is-done .voice__glow { animation: voice-lift 1s ease-out; }
-@keyframes voice-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-@keyframes voice-wait { 0%, 100% { opacity: 0.65; } 50% { opacity: 1; } }
-@keyframes voice-lift { 0% { opacity: 1; } 35% { opacity: 1.7; } 100% { opacity: 1; } }
-@media (max-width: 640px) { .voice__glow { --voice-r: 190px; } }
-
-.voice__live { position: fixed; top: 43px; right: 188px; width: 6px; height: 6px; border-radius: 50%; pointer-events: none;
-  background: rgb(var(--voice-glow-rgb)); animation: voice-dot 2.4s ease-in-out infinite; }
-.voice[data-state="thinking"] .voice__live { animation-duration: 0.9s; }
-@keyframes voice-dot { 0%, 100% { opacity: 0.25; transform: scale(0.85); } 50% { opacity: 0.9; transform: scale(1); } }
-@media (max-width: 760px) { .voice__live { top: 35px; right: 176px; } }
 @media (prefers-reduced-motion: reduce) {
-  .voice__glow, .voice.is-done .voice__glow, .voice[data-state="thinking"] .voice__glow, .voice__live { animation: none; }
-  .voice__live { opacity: 0.7; }
+  body:has(.voice[data-state="thinking"]) .topbar__voice[aria-pressed="true"] { animation: none; }
+  .voice, .voice__heard.is-new, .voice__reply.is-new, .voice__arc, .voice.is-done .voice__arc, .voice[data-state="thinking"] .voice__arc { animation: none; }
+  .voice__arc, .voice-dock { transition: none; }
+  .voice[data-state="thinking"] ~ .voice-dock { animation: none; }
 }
 
-/* — usage: what voice has cost against its limit. A hairline bar, the way the rest of Settings draws things. — */
+/* — usage: what voice has cost against its limit (Settings). A hairline bar, the way the rest of Settings draws things. — */
 .usage { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .usage__bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
 .usage__bar i { display: block; height: 100%; min-width: 2px; background: var(--text); border-radius: 2px; transition: width 0.4s ease; }
@@ -93,24 +124,24 @@ body.voice-on .notice { bottom: calc(var(--voice-h, 200px) + 8px); }
 .usage__text { margin: 0; display: flex; justify-content: space-between; gap: 12px; font-family: var(--font-mono); font-size: 11px; color: var(--text-2); }
 .usage__text--quiet { color: var(--text-4); }
 
-/* — phones: no Esc key to name, targets a thumb can hit, room for the home bar, the footer kept to one line — */
-@media (hover: none) {
-  .voice__esc { display: none; }
-  .voice__btn { padding: 12px 4px; min-height: 44px; }
+/* — phones: the mic is a labelled pill until voice mode is on, targets a thumb can hit, the reply a size down — */
+@media (max-width: 760px) {
+  :root { --dock-zone: 88px; }   /* the button's room */
+  .voice-dock { width: auto; padding: 0 24px 0 20px; bottom: calc(18px + env(safe-area-inset-bottom)); }
+  .voice-dock__label { display: inline; }
+  body.voice-on .voice-dock { width: 52px; padding: 0; }
+  body.voice-on .voice-dock__label { display: none; }
+  .voice { padding-left: 16px; padding-right: 16px; }
+  .voice__undo { padding: 10px 6px; }
 }
 @media (max-width: 480px) {
-  .voice__foot { grid-template-columns: auto 1fr auto; column-gap: 12px; }
-  .voice__hint { text-align: center; }
-  .voice__usage-bar { width: 24px; }
-  .voice__reply { font-size: 15px; line-height: 22px; }
+  .voice__reply { font-size: 14.5px; line-height: 22px; }
   .voice__heard { font-size: 11px; }
-  .voice__level { width: 180px; }
 }
 
-/* A short screen (a phone on its side): less text, no level bars, so the controls always have room. */
+/* A short screen (a phone on its side): less text, so the mic and the words always fit. */
 @media (max-height: 520px) {
   .voice { padding-top: 48px; }
   .voice__reply { -webkit-line-clamp: 2; line-clamp: 2; }
   .voice__heard { -webkit-line-clamp: 1; line-clamp: 1; }
-  .voice__level { display: none; }
 }

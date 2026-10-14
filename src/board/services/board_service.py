@@ -55,7 +55,8 @@ class BoardRow:
 class DoneRow:
     id: int
     title: str
-    closed_on: str
+    closed_on: str   # how long ago, as the open rows show their age: "1d", "2d"
+    closed_date: str = ""   # the day itself, for the tooltip
 
 
 RECENTLY_DONE = 10
@@ -91,11 +92,12 @@ class BoardService:
     @staticmethod
     def done(user) -> list[DoneRow]:
         """The last few todos closed, newest first: they close out the list, one click from reopening."""
-        today = timezone.localdate()
+        now = timezone.now()
         rows = []
         for todo in TodoService.recently_closed(user, RECENTLY_DONE):
             day = timezone.localtime(todo.closed_at).date()
-            rows.append(DoneRow(id=todo.id, title=todo.title, closed_on="today" if day == today else f"{day:%b} {day.day}"))
+            days = InsightsService.days_between(todo.closed_at, now)   # calendar days, as the open rows count their age
+            rows.append(DoneRow(id=todo.id, title=todo.title, closed_on=f"{days}d" if days > 0 else "today", closed_date=f"{day:%b} {day.day}"))
         return rows
 
     @staticmethod

@@ -636,16 +636,27 @@ class UsageScreenTests(VoiceBase):
     def test_a_member_sees_their_spend_on_the_board_and_in_settings(self):
         VoiceCommand.objects.create(user=self.user, llm_cost=Decimal("0.0047"))
         board = self.page(self.user, reverse("board:index"))
-        self.assertIn('id="voice-usage-text">$0.0047 of $1.00', board)
+        self.assertIn("topbar__voice", board)                      # the mic in the top bar, before "All todos"
+        self.assertLess(board.index("topbar__voice"), board.index('aria-label="All todos'))
+        self.assertIn('id="voice-dock"', board)                    # and the button at the foot, for phones
+        self.assertNotIn("voice-usage", board)                     # what it costs is in Settings, not on the bar
+        self.assertIn('data-left="$0.9953"', board)
         settings_page = self.page(self.user, reverse("board:settings"))
         self.assertIn("AI usage", settings_page)
         self.assertIn("$0.0047 of $1.00", settings_page)
         self.assertIn("You have $1.00 for now", settings_page)
 
+    def test_both_typing_boxes_have_their_plus_and_no_mic_of_their_own(self):
+        board = self.page(self.user, reverse("board:index"))
+        self.assertEqual(board.count('class="composer__plus"'), 2)   # Add a todo, Add an update
+        self.assertNotIn("composer__mic", board)
+
     def test_a_guest_sees_it_too_with_their_own_wording(self):
         guest = GuestService.create_guest()
         VoiceCommand.objects.create(user=guest, llm_cost=Decimal("0.25"))
-        self.assertIn('id="voice-usage-text">$0.25 of $1.00', self.page(guest, reverse("board:index")))
+        board = self.page(guest, reverse("board:index"))
+        self.assertIn("topbar__voice", board)
+        self.assertIn('data-percent="25"', board)
         settings_page = self.page(guest, reverse("board:settings"))
         self.assertIn("A guest gets $1.00 to try it", settings_page)
         self.assertIn("$0.25 of $1.00", settings_page)
@@ -657,11 +668,13 @@ class UsageScreenTests(VoiceBase):
     @override_settings(GROQ_API_KEY="")
     def test_without_the_keys_there_is_no_voice_and_no_usage_section(self):
         self.assertNotIn("AI usage", self.page(self.user, reverse("board:settings")))
-        self.assertNotIn("voice-usage-text", self.page(self.user, reverse("board:index")))
+        board = self.page(self.user, reverse("board:index"))
+        self.assertNotIn("voice-dock", board)
+        self.assertNotIn("topbar__voice", board)
 
     def test_a_user_at_their_limit_gets_the_bar_marked_full_and_the_message(self):
         VoiceCommand.objects.create(user=self.user, llm_cost=Decimal("1.00"))
         board = self.page(self.user, reverse("board:index"))
         self.assertIn('data-limited="1"', board)
         self.assertIn("used your $1.00 of voice.", board)
-        self.assertIn("usage--full", board)
+        self.assertIn('data-percent="100"', board)

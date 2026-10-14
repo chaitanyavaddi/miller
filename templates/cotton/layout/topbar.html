@@ -2,7 +2,7 @@
 <header class="topbar">
   <c-ui.logo class="topbar__brand" />
   <div class="topbar__actions">
-    {% if voice %}<c-ui.icon-button class="topbar__voice" label="Voice mode" title="Voice mode (V)" data-action="voice-toggle" aria-pressed="false" aria-keyshortcuts="v"><c-ui.icon name="mic" /></c-ui.icon-button>{% endif %}
+    {% if voice %}<c-ui.icon-button class="topbar__voice" label="Voice mode" title="Voice mode (V)" data-action="voice-toggle" aria-pressed="false" aria-keyshortcuts="v"><c-ui.icon name="mic" /><span class="topbar__voice-stop" aria-hidden="true"></span></c-ui.icon-button>{% endif %}
     <c-ui.icon-button label="All todos: past and scheduled" title="All todos" data-action="menu-close" hx-get="{% url 'board:review' %}" hx-target="#overlay" hx-swap="innerHTML"><c-ui.icon name="todos" /></c-ui.icon-button>
     <button type="button" class="topbar__account" aria-label="Account" aria-haspopup="true" aria-controls="account-menu" data-action="menu-toggle"><span class="avatar">{{ user.initial }}</span></button>
     <div class="account-menu" id="account-menu">

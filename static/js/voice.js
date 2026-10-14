@@ -1,7 +1,7 @@
-/* Voice mode. Turn it on (the mic in the top bar, or V) and the page is run by speaking: the add-todo box and
+/* Voice mode. Turn it on (the mic in the top bar, the button at the foot on a phone, or V) and the page is run by speaking: the add-todo box and
  * the composer go away, the microphone stays open, and each thing you say, once you pause, is sent as a
  * command: add, rename, close, or write an update on a todo. Miller answers in writing, never aloud; if it
- * needs to ask something, just answer. Esc (or Exit) turns it off and lets go of the microphone.
+ * needs to ask something, just answer. The mic again (or Esc, or saying you're done) turns it off and lets go of the microphone.
  *
  * Only the final words are shown: they come back from the server once you've paused, spelled by the same
  * model that acts on them, so nothing is shown and then corrected.
@@ -33,8 +33,12 @@
   const reply = document.getElementById('voice-reply');
   const hint = document.getElementById('voice-hint');
   const undoButton = document.getElementById('voice-undo');
-  const canvas = bar.querySelector('canvas');
-  const toggles = document.querySelectorAll('.topbar__voice');
+  const meta = bar.querySelector('.voice__meta');
+  const dock = document.getElementById('voice-dock');                 /* the button at the foot (phones) */
+  const mic = document.querySelector('.topbar__voice');               /* the one in the top bar (everywhere else) */
+  const buttons = [mic, dock].filter(Boolean);
+  const arc = bar.querySelector('.voice__arc');
+  const stage = bar.querySelector('.voice__stage');
   const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   const csrf = () => (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
@@ -56,27 +60,58 @@
 
   /* ———————————————————————— the bar's words ———————————————————————— */
 
+  let left = Number(bar.dataset.percent) >= 80 ? bar.dataset.left : '';   /* what's left of the budget, said once it's running low */
+
+  /* The quiet line under the words says nothing while all is well: the mic's ring and the arch already show it is
+     listening, or working. It has a word only for what needs one (a limit, a blocked mic), and Undo. */
   function setState(next, text) {
     state = next;
     bar.dataset.state = next;
-    hint.textContent = text || (next === 'thinking' ? 'Working on it…' : 'Listening');
+    hint.textContent = text || (next === 'listening' && left ? `${left} left` : '');
+    syncMeta();
   }
+
+  function syncMeta() { meta.hidden = !hint.textContent && undoButton.hidden; }
 
   function write(el, text) {
     el.textContent = text || '';
     el.classList.remove('is-new');
     if (text && !calm.matches) { void el.offsetWidth; el.classList.add('is-new'); }
+    if (typeof sizeArc === 'function') requestAnimationFrame(sizeArc);   /* the arch stands round whatever is written */
   }
+
+  const quoted = text => (text ? `“${text.trim()}”` : '');
 
   function setUndo(id) {
     undoId = id || null;
     undoButton.hidden = !undoId;
+    syncMeta();
   }
 
   /* The bar is as tall as its words; the page keeps that much room clear at the foot (voice.css reads --voice-h). */
   if (window.ResizeObserver) {
     new ResizeObserver(() => document.documentElement.style.setProperty('--voice-h', `${Math.round(bar.getBoundingClientRect().height)}px`)).observe(bar);
   }
+
+  /* The arch of light stands round the words: wide and tall enough that they sit in its clear middle, so a longer
+     answer makes a bigger arch (it eases there, voice.css). The words' own width, not the box they could fill. */
+  const textWidth = el => {
+    if (!el.textContent) return 0;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    return range.getBoundingClientRect().width;
+  };
+
+  function sizeArc() {
+    const box = stage.getBoundingClientRect();
+    if (!box.width) return;
+    /* The answer sets the size; what was said, small and quiet, counts for less. 44: the gap down to the mic. */
+    const w = Math.max(textWidth(reply), textWidth(heard) * 0.75, 240), h = box.height + 44;
+    bar.style.setProperty('--arc-w', `${Math.round(Math.min(w * 2, innerWidth * 1.4))}px`);
+    bar.style.setProperty('--arc-h', `${Math.round(Math.max(h * 1.9, 190))}px`);
+  }
+  if (window.ResizeObserver) new ResizeObserver(sizeArc).observe(stage);
+  window.addEventListener('resize', () => { if (on) sizeArc(); });
 
   /* ———————————————————————— turning voice mode on and off ———————————————————————— */
 
@@ -85,7 +120,7 @@
     on = value;
     document.body.classList.toggle('voice-on', on);
     bar.hidden = !on;
-    toggles.forEach(b => b.setAttribute('aria-pressed', on ? 'true' : 'false'));
+    buttons.forEach(b => { b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.setAttribute('aria-label', on ? 'Stop voice mode' : 'Voice mode'); });
     try { localStorage.setItem(STORE, on ? '1' : '0'); } catch (_) { /* a convenience only */ }
     if (on) {
       if (isTyping(document.activeElement)) document.activeElement.blur();
@@ -93,7 +128,7 @@
       session = (window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(0, 36);
       limited = bar.dataset.limited === '1';
       setState('listening');
-      startAnimation();
+      sizeArc();
       if (limited) { stopForLimit(bar.dataset.limitMessage || 'You’ve reached your voice limit.'); return; }
       if (!supported()) { write(reply, 'Voice needs a browser that can record audio: Chrome, Edge, Firefox or Safari.'); setState('listening', 'Not supported'); return; }
       if (!(await openMic()) && on) { write(reply, 'Miller needs the microphone. Allow it in the browser, then turn voice on again.'); setState('listening', 'Microphone blocked'); return; }
@@ -101,9 +136,10 @@
     } else {
       clearInterval(ticker); clearTimeout(waitTimer); ticker = null;
       endSegment(false);
-      stopAnimation();
       releaseMic();
       turn = null;
+      /* The update box sizes itself to what's in it (comments.js), and could not while it was hidden: have it measure again. */
+      requestAnimationFrame(() => document.querySelectorAll('#comment-input').forEach(box => box.dispatchEvent(new Event('input', { bubbles: true }))));
     }
   }
 
@@ -177,9 +213,10 @@
     const now = Date.now(), elapsed = Math.min(now - lastTick, 1000);   /* real time since the last look: a throttled page looks less often */
     lastTick = now;
     const asleep = !!audio && audio.state === 'suspended';
-    if (asleep !== sleeping) { sleeping = asleep; if (state === 'listening') hint.textContent = asleep ? 'Tap anywhere to start' : 'Listening'; }
+    if (asleep !== sleeping) { sleeping = asleep; if (state === 'listening') setState('listening', asleep ? 'Tap anywhere to start' : ''); }
     if (asleep) { awaken(); return; }
     level += (readLevel() - level) * 0.5;
+    feedLevel();
     if (!seg || state !== 'listening') return;
     const threshold = Math.max(0.03, floor * 2.5);
     if (level > threshold) { seg.voiced += elapsed; seg.lastVoice = now; }
@@ -215,7 +252,7 @@
 
   function onHeard(data) {
     if (!turn || data.turn !== turn.id) return;
-    write(heard, data.text);
+    write(heard, quoted(data.text));
     write(reply, ''); setUndo(null);
   }
 
@@ -223,8 +260,8 @@
     if (!turn || result.turn !== turn.id || turn.finished) return;
     turn.finished = true;
     clearTimeout(waitTimer);
-    if (result.heard && result.outcome !== 'nothing' && !heard.textContent) write(heard, result.heard);   /* a page with no live stream hears its words here */
-    if (result.reply) write(reply, result.reply);   /* nothing heard says nothing: back to listening */
+    if (result.heard && result.outcome !== 'nothing' && !heard.textContent) write(heard, quoted(result.heard));   /* a page with no live stream hears its words here */
+    if (result.reply) write(reply, result.reply.split(' · ').join('\n'));   /* one change to a line; nothing heard says nothing */
     setUndo(result.undo);
     if (result.undo) { bar.classList.remove('is-done'); void bar.offsetWidth; bar.classList.add('is-done'); }   /* the light swells once: it landed */
     if (result.undo && !live()) announce({ show: result.show, touched: result.touched, read: result.read });   /* no live stream to say so: refresh the list ourselves */
@@ -235,11 +272,11 @@
     if (on) beginSegment();
   }
 
+  /* Settings shows what voice has cost; here, only a word when it's running low. */
   function showUsage(usage) {
     if (!usage) return;
-    const text = document.getElementById('voice-usage-text'), box = document.getElementById('voice-usage');
-    if (text) text.textContent = `${usage.spent} of ${usage.limit}`;
-    if (box) { box.classList.toggle('usage--full', !!usage.full); const fill = box.querySelector('i'); if (fill) fill.style.width = `${usage.percent}%`; }
+    left = usage.percent >= 80 && !usage.full ? usage.left : '';
+    if (state === 'listening' && !sleeping && !/limit|blocked|supported|Tap/i.test(hint.textContent)) setState('listening');
   }
 
   /* — going somewhere: a todo's thread, one of the panels, or out of voice mode — */
@@ -298,7 +335,7 @@
 
   document.addEventListener('keydown', e => {
     if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
-    if ((e.key === 'v' || e.key === 'V') && !isTyping(document.activeElement) && toggles.length) {
+    if ((e.key === 'v' || e.key === 'V') && !isTyping(document.activeElement) && buttons.length) {
       e.preventDefault(); setOn(!on); return;
     }
     if (on && e.key === 'Escape') setOn(false);
@@ -306,49 +343,17 @@
 
   /* ———————————————————————— the level ———————————————————————— */
 
-  /* A row of hairline bars, centred, in the ink colour: the same quiet mark as the recorder's level.
-     They rise and fall with your voice; while Miller works, one soft pass of light crosses them. */
-  const BARS = 41;
-  let frame = 0, ctx = null, width = 0, height = 0, shown = 0, t0 = 0;
-
-  function resize() {
-    const ratio = window.devicePixelRatio || 1;
-    width = canvas.clientWidth; height = canvas.clientHeight;
-    canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio);
-    ctx = canvas.getContext('2d');
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  /* The light follows the voice: tick() hands the level to the arch, the window's hairline and the mic's ring
+     (voice.css reads --voice-level). Only when it has moved enough to see. */
+  let shownLevel = -1;
+  function feedLevel() {
+    const value = calm.matches ? 0 : Math.min(1, level * 8);
+    if (Math.abs(value - shownLevel) < 0.03) return;
+    shownLevel = value;
+    const text = value.toFixed(2);
+    bar.style.setProperty('--voice-level', text);
+    buttons.forEach(b => b.style.setProperty('--voice-level', text));
   }
-
-  function draw(now) {
-    frame = requestAnimationFrame(draw);
-    if (document.hidden) return;
-    const t = (now - t0) / 1000;
-    const voice = Math.min(1, level * 8);
-    const goal = state === 'thinking' ? 0.22 : 0.05 + (calm.matches ? 0 : 0.02 * Math.sin(t * 1.3)) + voice * 0.95;
-    shown += (goal - shown) * 0.22;
-    bar.style.setProperty('--voice-level', (calm.matches ? 0 : Math.min(1, voice)).toFixed(3));   /* the light follows the voice (voice.css) */
-    const sweep = state === 'thinking' && !calm.matches ? ((t * 0.7) % 1.5) - 0.25 : -1;
-    ctx.clearRect(0, 0, width, height);
-    const step = width / BARS, mid = height / 2;
-    for (let i = 0; i < BARS; i++) {
-      const u = (i - (BARS - 1) / 2) / ((BARS - 1) / 2);               /* −1 … 1 across the row */
-      const centre = Math.exp(-u * u * 3);                              /* tall in the middle, nothing at the ends */
-      const wobble = 0.5 + 0.5 * Math.sin(t * 6 + i * 0.9) * Math.sin(t * 2.7 + i * 0.41);
-      const h = 2 + (height - 4) * centre * shown * (0.45 + 0.55 * (calm.matches ? 1 : wobble));
-      const lit = sweep < 0 ? 0 : Math.exp(-Math.pow((i / BARS - sweep) * 7, 2));
-      ctx.fillStyle = `rgba(38,37,30,${Math.min(0.9, 0.2 + 0.1 * centre + 0.55 * shown * centre + 0.5 * lit)})`;
-      ctx.fillRect(i * step + step / 2 - 0.75, mid - h / 2, 1.5, h);
-    }
-  }
-
-  function startAnimation() {
-    resize();
-    t0 = performance.now();
-    cancelAnimationFrame(frame);
-    frame = requestAnimationFrame(draw);
-  }
-  function stopAnimation() { cancelAnimationFrame(frame); }
-  window.addEventListener('resize', () => { if (on) resize(); });
 
   /* ———————————————————————— start where it was left ———————————————————————— */
 

@@ -465,3 +465,27 @@ class NotFoundPageTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertContains(response, "Nothing here.", status_code=404)
         self.assertContains(response, f'href="{reverse("board:home")}"', status_code=404)
+
+
+class DoneRowsAgeTests(TestCase):
+    """The done todos below the list say how long ago they were done, as open ones say their age: "1d", "2d"."""
+
+    def test_each_says_how_many_days_ago_and_keeps_the_date_for_its_tooltip(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from accounts.services import IdentityService
+        from board.services import BoardService
+        from todos.models import Todo
+        from todos.schemas import TodoTitleSchema
+        from todos.services import TodoService
+
+        user = IdentityService.create_user("done@x.com")
+        yesterday, older = (TodoService.create(user, TodoTitleSchema(title=t)) for t in ("yesterday", "older"))
+        for todo, days in ((yesterday, 1), (older, 3)):
+            TodoService.close(todo)
+            Todo.objects.filter(pk=todo.pk).update(closed_at=timezone.now() - timedelta(days=days))
+        rows = {row.title: row for row in BoardService.done(user)}
+        self.assertEqual((rows["yesterday"].closed_on, rows["older"].closed_on), ("1d", "3d"))
+        self.assertRegex(rows["older"].closed_date, r"^[A-Z][a-z]{2} \d{1,2}$")   # e.g. "Oct 11"

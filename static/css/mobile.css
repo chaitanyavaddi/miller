@@ -1,7 +1,6 @@
 /* — phones: one pane at a time. The list of todos is the home screen; touching a todo opens it on its thread, with
-     a way back; and at the foot of the screen, where a thumb rests, one clean button for voice, which is how
-     most people on a phone will use Miller. (todos.js keeps `mobile-thread` on <body> while a thread is open.) — */
-.thread__back, .voice-fab { display: none; }
+     a way back, and at the foot of the screen, where a thumb rests, the voice button. (todos.js keeps `mobile-thread` on <body> while a thread is open; the voice button is voice.css.) — */
+.thread__back { display: none; }
 
 @media (max-width: 760px) {
   .board { row-gap: 0; }
@@ -20,19 +19,8 @@
   .thread__crumb { display: inline-flex; align-items: center; min-width: 0; white-space: nowrap; }
   .thread__crumb-strong { text-overflow: ellipsis; overflow: hidden; }
 
-  /* The voice button: the page's one dark control, floating at the foot, centred. */
-  .voice-fab { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 18;
-    display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 24px 0 20px; border: none; border-radius: 26px; cursor: pointer;
-    background: var(--text); color: var(--bg); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
-    box-shadow: 0 8px 24px rgba(38, 37, 30, 0.18); -webkit-tap-highlight-color: transparent; transition: transform 0.12s ease; }
-  .voice-fab:active { transform: translateX(-50%) scale(0.96); }
-  body.voice-on .voice-fab { display: none; }   /* voice mode has its own bar */
-
-  /* The top bar's mic is the button above, so it steps aside; notices rise clear of the button. */
-  .topbar__voice { display: none; }
-  .voice .voice__live { right: 122px; }
+  /* Notices rise clear of the voice button. */
   .toast, .notice { bottom: calc(86px + env(safe-area-inset-bottom)); }
   body.voice-on .toast, body.voice-on .notice { bottom: calc(var(--voice-h, 200px) + 8px); }
 }
 
-@media (prefers-reduced-motion: reduce) { .voice-fab { transition: none; } }

@@ -148,10 +148,9 @@ class ThreadTests(RecordingTestCase):
         from todos.services import TodoService
         return TodoService.create(self.user, TodoTitleSchema(title="write the plan"))
 
-    def test_a_todos_composer_offers_the_mic(self):
-        todo = self.task()
-        page = self.thread(todo)
-        self.assertContains(page, f'data-voice-url="{reverse("recordings:voice", args=[todo.id])}"')
+    def test_a_todos_update_box_has_no_mic_of_its_own_the_one_voice_button_covers_it(self):
+        page = self.thread(self.task())
+        self.assertNotContains(page, "data-voice-url")
         self.assertNotContains(page, "data-record-url")
 
     def test_a_meeting_thats_on_offers_its_call_in_the_thread_and_no_mic(self):

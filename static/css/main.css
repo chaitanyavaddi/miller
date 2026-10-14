@@ -45,10 +45,10 @@ a.text-btn { display: inline-block; }
 /* — top bar: full width, logo far left, controls far right; both stay out of sight until the
      bar is hovered (or a control in it has focus, or the account menu is open). — */
 .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; height: 68px; padding: 24px 32px 0; }
-.topbar__brand, .topbar__actions { opacity: 0; transition: opacity 0.15s ease; }
-.topbar:hover .topbar__brand, .topbar:hover .topbar__actions,
-.topbar:focus-within .topbar__brand, .topbar:focus-within .topbar__actions,
-.topbar:has(.account-menu--open) .topbar__brand, .topbar:has(.account-menu--open) .topbar__actions { opacity: 1; }
+.topbar__brand, .topbar__actions > :not(.topbar__voice) { opacity: 0; transition: opacity 0.15s ease; }   /* (the voice button never rests: voice.css) */
+.topbar:hover .topbar__brand, .topbar:hover .topbar__actions > *,
+.topbar:focus-within .topbar__brand, .topbar:focus-within .topbar__actions > *,
+.topbar:has(.account-menu--open) .topbar__brand, .topbar:has(.account-menu--open) .topbar__actions > * { opacity: 1; }
 .topbar__brand { font-size: 15px; font-weight: 600; letter-spacing: -0.03em; }
 .logo { display: inline-flex; align-items: center; gap: 0.4em; }
 .logo__mark { width: 1.15em; height: auto; flex: none; }
@@ -83,7 +83,7 @@ a.text-btn { display: inline-block; }
 .composer__plus { font-family: var(--font-mono); font-size: 13px; color: var(--text-4); flex: none; }
 .composer:focus-within .composer__plus { color: var(--text); }
 .composer__input { flex: 1 1 auto; min-width: 0; border: none; outline: none; background: transparent; padding: 0; font: inherit; font-size: 13.5px; color: var(--text); }
-.composer__input:focus-visible { outline: none; }
+.composer__input:focus, .composer__input:focus-visible { outline: none; box-shadow: none; }   /* the typing boxes: no dotted ring or line; the + darkening is the cue */
 .composer__hint { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); flex: none; display: none;
   background: none; border: none; padding: 0; cursor: pointer; }
 .composer__hint:hover, .composer__hint:focus-visible { color: var(--text); }
@@ -112,7 +112,7 @@ a.text-btn { display: inline-block; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(4px); } }
 
 @media (hover: none) {
-  .topbar__brand, .topbar__actions { opacity: 1; }
+  .topbar__brand, .topbar__actions > * { opacity: 1; }
   /* Fingers: the Add and Send buttons get a target a thumb can find, and read as buttons. */
   .composer__hint, .composer__send { min-width: 56px; min-height: 44px; padding: 0 8px; color: var(--text-2); }
 }
