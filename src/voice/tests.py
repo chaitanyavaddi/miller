@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -8,6 +8,8 @@ from django.utils import timezone
 
 from accounts.services import GuestService, IdentityService
 from comments.models import Attachment, Comment
+from scheduled.models import ScheduledItem
+from scheduled.services import ScheduleService
 from todos.models import Todo
 from todos.schemas import TodoTitleSchema
 from todos.services import TodoService
@@ -377,7 +379,7 @@ class DoneTodoTests(VoiceBase):
         todos = CommandService.todos_for(self.user)
         prompt = DecisionService.build_body("reopen it", todos, [], "m", done_earlier=CommandService.done_earlier(self.user))["messages"][1]["content"]
         self.assertIn(f"#{self.acme.id} [task, done] (number 1) Acme follow-up", prompt)
-        self.assertIn(f"Done earlier (only reopen applies):\n#{self.old.id} Check Dubai flights", prompt)
+        self.assertIn(f"Done earlier (only reopen or schedule apply):\n#{self.old.id} Check Dubai flights", prompt)
         self.assertNotIn("Done earlier", DecisionService.build_body("hi", todos, [], "m")["messages"][1]["content"])
 
 
@@ -625,6 +627,167 @@ class VoiceCommandViewTests(VoiceBase):
         self.assertIsNone(Todo.objects.get(pk=self.acme.id).closed_at)
 
 
+class ScheduleByVoiceTests(VoiceBase):
+    """"Move it to Friday", "...at 3pm", "remind me at 4", "schedule a call with mum for the 20th"."""
+
+    def setUp(self):
+        super().setUp()
+        self.today = timezone.localdate()
+        self.friday = self.today + timedelta(days=3)
+
+    def schedule(self, todo=None, text=None, day=None, at=None):
+        return Operation(Op.SCHEDULE, todo.id if todo else None, text, date=(day or self.friday).isoformat(), time=at)
+
+    def run_ops(self, *operations):
+        valid, problems = CommandService.validate(CommandService.todos_for(self.user), list(operations))
+        return valid, problems, (CommandService.apply(self.user, valid) if valid else None)
+
+    def undo(self, applied):
+        return CommandService.undo(VoiceCommand.objects.create(user=self.user, applied=applied.done, undo=applied.undo))
+
+    def listed(self):
+        return [t.title for t in TodoService.listed_for(self.user)]
+
+    def test_a_todo_moves_to_a_day_and_leaves_today_with_no_reminder(self):
+        _, problems, applied = self.run_ops(self.schedule(self.invoice))
+        self.assertEqual(problems, [])
+        self.assertEqual(self.listed(), ["Acme follow-up"])
+        item = ScheduledItem.objects.get()
+        self.assertEqual((item.todo_id, item.on_date, item.at_time), (self.invoice.id, self.friday, None))
+        self.assertEqual(applied.lines, [f"Moved “Send invoice” to {ScheduleService.short_date(self.friday)}"])
+
+    def test_a_time_comes_with_it_and_is_said_back(self):
+        _, _, applied = self.run_ops(self.schedule(self.invoice, at="15:00"))
+        self.assertEqual(ScheduledItem.objects.get().at_time, time(15, 0))
+        self.assertTrue(applied.lines[0].endswith(" · 3pm"))
+
+    def test_undo_brings_it_back_to_its_place(self):
+        _, _, applied = self.run_ops(self.schedule(self.invoice, at="15:00"))
+        self.assertTrue(self.undo(applied))
+        self.assertEqual(self.listed(), ["Acme follow-up", "Send invoice"])
+        self.assertFalse(ScheduledItem.objects.exists())
+        self.assertFalse(self.invoice.comments.exists())
+
+    def test_today_with_a_time_is_only_a_reminder_and_undo_takes_it_off(self):
+        later = (timezone.localtime() + timedelta(hours=2)).replace(second=0, microsecond=0)
+        if later.date() != self.today:
+            self.skipTest("too near midnight for a time later today")
+        _, problems, applied = self.run_ops(self.schedule(self.invoice, day=self.today, at=later.strftime("%H:%M")))
+        self.assertEqual(problems, [])
+        self.assertEqual(self.listed(), ["Acme follow-up", "Send invoice"])   # it didn't move
+        self.assertEqual(Todo.objects.get(pk=self.invoice.id).notify_at, later)
+        self.assertEqual(applied.lines[0], f"Reminder set for “Send invoice” at {later.strftime('%-I:%M%p').lower().replace(':00', '')}")
+        self.undo(applied)
+        self.assertIsNone(Todo.objects.get(pk=self.invoice.id).notify_at)
+
+    def test_today_without_a_time_is_nothing_to_do_and_a_time_gone_by_is_refused(self):
+        self.assertEqual(self.run_ops(self.schedule(self.invoice, day=self.today))[0], [])
+        with patch("django.utils.timezone.now", return_value=timezone.now().replace(hour=15, minute=0)):
+            valid, problems, _ = self.run_ops(self.schedule(self.invoice, day=timezone.localdate(), at="09:00"))
+        self.assertEqual((valid, problems), ([], ["that time has already passed"]))
+
+    def test_a_day_that_has_passed_or_is_too_far_or_unreadable_is_refused(self):
+        for day, at in (((self.today - timedelta(days=1)).isoformat(), None), ((self.today + timedelta(days=500)).isoformat(), None),
+                        ("next friday", None), (None, None), (self.friday.isoformat(), "teatime")):
+            operation = Operation(Op.SCHEDULE, self.invoice.id, date=day, time=at)
+            valid, problems, _ = self.run_ops(operation)
+            self.assertEqual((valid, len(problems)), ([], 1), (day, at))
+        self.assertFalse(ScheduledItem.objects.exists())
+
+    def test_a_done_todo_is_reopened_and_scheduled_and_undo_closes_it_again(self):
+        TodoService.close(self.acme)
+        _, problems, applied = self.run_ops(self.schedule(self.acme, at="15:00"))
+        self.assertEqual(problems, [])
+        self.assertIsNone(Todo.objects.get(pk=self.acme.id).closed_at)
+        self.assertEqual(ScheduledItem.objects.get().todo_id, self.acme.id)
+        self.undo(applied)
+        self.assertIsNotNone(Todo.objects.get(pk=self.acme.id).closed_at)
+        self.assertFalse(ScheduledItem.objects.exists())
+
+    def test_asking_for_a_reminder_on_a_done_todo_reopens_it_and_sets_it(self):
+        later = (timezone.localtime() + timedelta(hours=2)).replace(second=0, microsecond=0)
+        if later.date() != self.today:
+            self.skipTest("too near midnight")
+        TodoService.close(self.acme)
+        _, problems, applied = self.run_ops(self.schedule(self.acme, day=self.today, at=later.strftime("%H:%M")))
+        self.assertEqual(problems, [])
+        todo = Todo.objects.get(pk=self.acme.id)
+        self.assertEqual((todo.closed_at, todo.notify_at), (None, later))
+        self.undo(applied)
+        todo.refresh_from_db()
+        self.assertIsNotNone(todo.closed_at)
+        self.assertIsNone(todo.notify_at)
+
+    def test_only_a_task_that_is_open_and_yours_can_be_moved(self):
+        other = TodoService.create(IdentityService.create_user("o@x.com"), TodoTitleSchema(title="theirs"))
+        meeting = Todo.objects.create(user=self.user, title="Standup", kind=Todo.Kind.MEETING, position=9,
+                                      starts_at=timezone.now(), ends_at=timezone.now() + timedelta(hours=1))
+        self.user.show_meetings = True
+        self.user.save()
+        for operation in (self.schedule(meeting), Operation(Op.SCHEDULE, other.id, date=self.friday.isoformat()),
+                          Operation(Op.SCHEDULE, 9999, date=self.friday.isoformat())):
+            self.assertEqual(self.run_ops(operation)[0], [], operation)
+
+    def test_a_new_todo_can_be_scheduled_for_a_day_with_a_time(self):
+        _, problems, applied = self.run_ops(self.schedule(text="Buy a cake", at="09:30"))
+        self.assertEqual(problems, [])
+        item = ScheduledItem.objects.get()
+        self.assertEqual((item.title, item.on_date, item.at_time, item.todo_id), ("Buy a cake", self.friday, time(9, 30), None))
+        self.assertEqual(applied.lines, [f"Scheduled “Buy a cake” for {ScheduleService.short_date(self.friday)} · 9:30am"])
+        self.assertNotIn("Buy a cake", self.listed())   # it arrives that day
+        self.undo(applied)
+        self.assertFalse(ScheduledItem.objects.exists())
+
+    def test_a_new_todo_for_today_is_just_added_with_its_reminder(self):
+        later = (timezone.localtime() + timedelta(hours=3)).replace(second=0, microsecond=0)
+        if later.date() != self.today:
+            self.skipTest("too near midnight for a time later today")
+        _, _, applied = self.run_ops(self.schedule(text="Call mum", day=self.today, at=later.strftime("%H:%M")))
+        todo = Todo.objects.get(title="Call mum")
+        self.assertEqual(todo.notify_at, later)
+        self.undo(applied)
+        self.assertTrue(Todo.objects.get(pk=todo.pk).deleted_at)
+
+    def test_a_new_one_needs_a_title(self):
+        self.assertEqual(self.run_ops(self.schedule(text=" "))[0], [])
+
+    def test_the_model_is_told_the_date_and_given_the_fields(self):
+        todos = CommandService.todos_for(self.user)
+        today = timezone.localdate()
+        prompt = DecisionService.build_body("move it to friday", todos, [], "m", today=today)["messages"][1]["content"]
+        self.assertIn(f"Today is {today:%A} {today.isoformat()}.", prompt)
+        self.assertIn("schedule", DecisionService.build_body("x", todos, [], "m")["messages"][0]["content"])
+
+    def test_the_models_date_and_time_are_read_and_junk_is_dropped(self):
+        decision = DecisionService.parse({"reply": "", "operations": [
+            {"op": "schedule", "todo_id": 4, "text": None, "date": "2026-10-16", "time": "15:00"},
+            {"op": "schedule", "todo_id": 4, "text": None, "date": 5, "time": ["x"]}]})
+        first, second = decision.operations
+        self.assertEqual((first.date, first.time, second.date, second.time), ("2026-10-16", "15:00", None, None))
+
+    def test_the_next_prompt_remembers_what_was_scheduled(self):
+        _, _, applied = self.run_ops(self.schedule(self.invoice, at="15:00"))
+        command = VoiceCommand.objects.create(user=self.user, outcome="applied", applied=applied.done)
+        self.assertEqual(command.digest(), f"schedule #{self.invoice.id} on {self.friday.isoformat()} at 15:00")
+
+
+@override_settings(GROQ_API_KEY="g", OPENROUTER_API_KEY="o")
+class ScheduleByVoiceViewTests(VoiceBase):
+    def test_a_spoken_schedule_moves_the_todo_flags_it_and_is_undoable(self):
+        friday = timezone.localdate() + timedelta(days=3)
+        decision = Decision([Operation(Op.SCHEDULE, self.invoice.id, date=friday.isoformat(), time="15:00")])
+        self.client.force_login(self.user)
+        with patch("voice.views.RecordingService.listen", return_value=("move the invoice to friday at three", 3.0)), \
+             patch("voice.views.DecisionService.decide", return_value=(decision, 100)) as decide, patch("voice.views.publish"):
+            body = self.client.post(reverse("voice:command"), data=b"a", content_type="application/octet-stream").json()
+        self.assertEqual(decide.call_args.kwargs["today"], timezone.localdate())
+        self.assertEqual((body["outcome"], body["touched"]), ("applied", [self.invoice.id]))
+        self.assertTrue(ScheduledItem.objects.filter(todo=self.invoice, at_time=time(15, 0)).exists())
+        with patch("voice.views.publish"):
+            self.client.post(reverse("voice:undo", args=[body["undo"]]))
+        self.assertFalse(ScheduledItem.objects.exists())
+
+
 @override_settings(GROQ_API_KEY="g", OPENROUTER_API_KEY="o")
 class UsageScreenTests(VoiceBase):
     """What a person sees of their spend: a bar in the voice mode footer, and a section in Settings."""
@@ -639,6 +802,7 @@ class UsageScreenTests(VoiceBase):
         self.assertIn("topbar__voice", board)                      # the mic in the top bar, before "All todos"
         self.assertLess(board.index("topbar__voice"), board.index('aria-label="All todos'))
         self.assertIn('id="voice-dock"', board)                    # and the button at the foot, for phones
+        self.assertIn('id="voice-stop"', board)                    # stopping is done inside the arch
         self.assertNotIn("voice-usage", board)                     # what it costs is in Settings, not on the bar
         self.assertIn('data-left="$0.9953"', board)
         settings_page = self.page(self.user, reverse("board:settings"))

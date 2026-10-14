@@ -9,13 +9,14 @@
   const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
   const dateLabel = iso => { const [y, m, d] = iso.split('-').map(Number); return `${ordinal(d)} ${MONTHS[m - 1]}, ${y}`; };
   const modal = () => document.querySelector('#overlay [data-scheduled]');
-  const FIELDS = ['rhythm', 'onDate', 'weekdays', 'monthDay'];
+  const FIELDS = ['rhythm', 'onDate', 'weekdays', 'monthDay', 'atTime'];
   const DETAIL = { once: ['date', 'onDate'], monthly: ['monthday', 'monthDay'] };  /* the picker each rhythm needs next */
 
   /* — a row's state — */
   function state(row) {
     const d = row.dataset;
-    return { title: row.querySelector('.scheduled-row__input').value.trim(), rhythm: d.rhythm, onDate: d.onDate, weekdays: d.weekdays, monthDay: d.monthDay };
+    const at = row.querySelector('[data-at-time]');
+    return { title: row.querySelector('.scheduled-row__input').value.trim(), rhythm: d.rhythm, onDate: d.onDate, weekdays: d.weekdays, monthDay: d.monthDay, atTime: at ? at.value : '' };
   }
 
   function remember(row) {  /* how it opened, to tell what changed */
@@ -170,7 +171,7 @@
       const s = state(row);
       const values = {
         row_id: row.dataset.id || '', row_removed: row.classList.contains('is-removed') ? '1' : '',
-        row_title: s.title, row_rhythm: s.rhythm || '', row_on_date: s.onDate || '', row_weekdays: s.weekdays || '', row_month_day: s.monthDay || '',
+        row_title: s.title, row_rhythm: s.rhythm || '', row_on_date: s.onDate || '', row_weekdays: s.weekdays || '', row_month_day: s.monthDay || '', row_at_time: s.atTime || '',
       };
       Object.entries(values).forEach(([name, value]) => {
         const input = document.createElement('input');

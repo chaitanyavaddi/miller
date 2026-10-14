@@ -21,6 +21,7 @@ class ScheduledItem(models.Model):
     on_date          = models.DateField(null=True, blank=True)                    # once
     weekdays         = models.CharField(max_length=20, blank=True)                # weekly: "0,3" (Monday is 0)
     month_day        = models.PositiveSmallIntegerField(null=True, blank=True)    # monthly: 1–31
+    at_time          = models.TimeField(null=True, blank=True)                    # optional time of day (the user's zone): a reminder at it, on each day it falls
     last_produced_on = models.DateField(null=True, blank=True)
     todo             = models.ForeignKey("todos.Todo", on_delete=models.CASCADE, null=True, blank=True, related_name="moves")
     created_at       = models.DateTimeField(auto_now_add=True)

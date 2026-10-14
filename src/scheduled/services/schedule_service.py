@@ -1,6 +1,6 @@
 import calendar
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 from django.db import transaction
 from django.db.models import QuerySet
@@ -10,6 +10,7 @@ from django.utils import timezone
 from comments.service import CommentService
 from scheduled import rhythm
 from scheduled.models import ScheduledItem
+from todos.models import Todo
 from todos.services import TodoService
 
 Rhythm = ScheduledItem.Rhythm
@@ -43,6 +44,7 @@ class ScheduledRow:
     on_date: str = ""     # ISO
     weekdays: str = ""    # "0,3"
     month_day: str = ""
+    at_time: str = ""     # 15:30, for the time box
     date_label: str = ""  # 17th October, 2026
     day_label: str = ""   # 1st
     moved: bool = False   # an existing todo moved to a date: its title and rhythm are its own, only the date changes
@@ -58,23 +60,56 @@ class ScheduleService:
         return f"{day:%a}, {day:%b} {day.day}"
 
     @staticmethod
+    def moment(day: date, at_time: time | None):
+        """When a reminder falls: that day at that time, in the zone in force (the user's). None without a time."""
+        return timezone.make_aware(datetime.combine(day, at_time)) if at_time else None
+
+    @staticmethod
+    def when_words(day: date, at_time: time | None) -> str:
+        """Fri, Oct 16 · 3pm: the day, and the time if it has one."""
+        return ScheduleService.short_date(day) + (f" · {rhythm.clock_label(at_time)}" if at_time else "")
+
+    @staticmethod
     @transaction.atomic
-    def move(todo, day: date) -> ScheduledItem:
-        """Take a todo off today's list until `day`, when the same todo comes back. Its thread says so."""
+    def move(todo, day: date, at_time: time | None = None) -> ScheduledItem:
+        """Take a todo off today's list until `day` (and `at_time`, if one is given), when the same todo comes back, with a
+        reminder at that time. Its thread says so."""
         item, _ = ScheduledItem.objects.update_or_create(
-            todo=todo, defaults={"user": todo.user, "title": todo.title, "rhythm": Rhythm.ONCE, "on_date": day, "last_produced_on": None},
+            todo=todo, defaults={"user": todo.user, "title": todo.title, "rhythm": Rhythm.ONCE, "on_date": day, "at_time": at_time, "last_produced_on": None},
         )
-        CommentService.note(todo, f"Moved to {ScheduleService.short_date(day)}")
+        if todo.notify_at:   # a reminder for the day it's leaving: it gets its new one when it comes back
+            Todo.objects.filter(pk=todo.pk).update(notify_at=None)
+        CommentService.note(todo, f"Moved to {ScheduleService.when_words(day, at_time)}")
         TodoService._renumber(todo.user)
         return item
 
     @staticmethod
-    def bring_back(item: ScheduledItem, note: str) -> None:
-        """A moved todo, back on today's list now (its date came, or the user brought it back)."""
-        todo = item.todo
+    @transaction.atomic
+    def remind(todo, day: date, at_time: time) -> None:
+        """A reminder for today, the todo staying where it is."""
+        Todo.objects.filter(pk=todo.pk).update(notify_at=ScheduleService.moment(day, at_time))
+
+    @staticmethod
+    @transaction.atomic
+    def unmove(todo) -> bool:
+        """Put a moved todo back where it was (taking back a move): its item goes, so it's on today's list again."""
+        removed, _ = ScheduledItem.objects.filter(todo=todo).delete()
+        if removed:
+            note = todo.comments.filter(automatic=True, body__startswith="Moved to").order_by("-created_at", "-id").first()
+            if note:
+                note.delete()
+            TodoService._renumber(todo.user)
+        return bool(removed)
+
+    @staticmethod
+    def bring_back(item: ScheduledItem, note: str, remind: bool = False) -> None:
+        """A moved todo, back on today's list now (its date came, or the user brought it back). On its day (`remind`),
+        a time it was given becomes the todo's reminder."""
+        todo, day, at_time = item.todo, item.on_date, item.at_time
         item.delete()
         if todo.closed_at is None and todo.deleted_at is None:
             TodoService.bring_back(todo)
+            Todo.objects.filter(pk=todo.pk).update(notify_at=ScheduleService.moment(day, at_time) if remind else None)
             CommentService.note(todo, note)
 
     @staticmethod
@@ -92,16 +127,18 @@ class ScheduleService:
                 continue
             item = get_object_or_404(ScheduleService.items_for(user), pk=change.id) if change.id else ScheduledItem(user=user)
             if item.todo_id:
-                if change.on_date and change.on_date != item.on_date:
-                    item.on_date = change.on_date
-                    item.save(update_fields=["on_date", "updated_at"])
-                    CommentService.note(item.todo, f"Moved to {ScheduleService.short_date(change.on_date)}")
+                if (change.on_date and change.on_date != item.on_date) or change.at_time != item.at_time:
+                    item.on_date = change.on_date or item.on_date
+                    item.at_time = change.at_time
+                    item.save(update_fields=["on_date", "at_time", "updated_at"])
+                    CommentService.note(item.todo, f"Moved to {ScheduleService.when_words(item.on_date, item.at_time)}")
                 continue
             item.title = change.title
             item.rhythm = change.rhythm
             item.on_date = change.on_date if change.rhythm == Rhythm.ONCE else item.on_date
             item.weekdays = ",".join(str(d) for d in change.weekdays) if change.rhythm == Rhythm.WEEKLY else item.weekdays
             item.month_day = change.month_day if change.rhythm == Rhythm.MONTHLY else item.month_day
+            item.at_time = change.at_time
             item.save()
 
     @staticmethod
@@ -120,6 +157,7 @@ class ScheduleService:
     def _row(item: ScheduledItem, today: date) -> ScheduledRow:
         return ScheduledRow(
             id=item.id, title=item.title, rhythm=item.rhythm,
+            at_time=item.at_time.strftime("%H:%M") if item.at_time else "",
             on_date=item.on_date.isoformat() if item.on_date else "", weekdays=item.weekdays, month_day=str(item.month_day or ""),
             date_label=ScheduleService.date_label(item.on_date) if item.on_date else "",
             day_label=rhythm.ordinal(item.month_day) if item.month_day else "",
@@ -152,9 +190,9 @@ class ScheduleService:
 
     @staticmethod
     def move_months(today: date) -> list[CalendarMonth]:
-        """The Scheduled calendar for Move to…: today can't be picked, only days after it."""
+        """The Scheduled calendar for Remind or move…: today (a reminder) and the days after it."""
         return [
-            CalendarMonth(m.title, m.lead, [Choice(d.value, d.label, enabled=d.enabled and not d.today, today=d.today) for d in m.days], m.shown)
+            CalendarMonth(m.title, m.lead, [Choice(d.value, d.label, enabled=d.enabled, today=d.today) for d in m.days], m.shown)
             for m in ScheduleService._months(ScheduledItem(rhythm=Rhythm.ONCE), today)
         ]
 

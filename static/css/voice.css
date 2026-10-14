@@ -2,7 +2,7 @@
      on and the typing boxes give way: your words and Miller's answer appear in a soft ring of light that grows with
      them, standing at the foot of the screen. Everything above stays as it was (scrolls, opens, drags) and fades out toward the
      bottom. Ink, never a colour; the only movement is the light rising with your voice. — */
-:root { --voice-glow-rgb: 38, 37, 30; --dock-zone: 44px; }   /* the room kept clear at the bottom: small, as the mic is up in the top bar */   /* the light's colour: Miller's ink. A warm tint to try instead: 196, 128, 84 */
+:root { --voice-glow-rgb: 38, 37, 30; --dock-zone: 32px; }   /* the room under the words: the stop sits just above it */   /* the light's colour: Miller's ink. A warm tint to try instead: 196, 128, 84 */
 
 body.voice-on .todo-form,
 body.voice-on .comment-form,
@@ -12,17 +12,14 @@ html:has(body.voice-on) { scroll-padding-bottom: calc(var(--voice-h, 220px) + 24
 body.voice-on .notice { bottom: calc(var(--voice-h, 220px) + 8px); }
 
 /* ——— the mic, in the top bar ——— */
-/* It never rests with the rest of the bar (main.css). On, it's a tinted button with a square (stop) and a ring that follows your voice. */
-.topbar__voice .topbar__voice-stop { display: none; width: 12px; height: 12px; border-radius: 3px; background: currentColor; }
-.topbar__voice[aria-pressed="true"] { color: var(--text); background: rgba(38, 37, 30, 0.07);
-  box-shadow: 0 0 0 calc(2px + var(--voice-level, 0) * 9px) rgba(var(--voice-glow-rgb), 0.08); }
-.topbar__voice[aria-pressed="true"] svg { display: none; }
-.topbar__voice[aria-pressed="true"] .topbar__voice-stop { display: block; }
-body:has(.voice[data-state="thinking"]) .topbar__voice[aria-pressed="true"] { animation: voice-dock-wait 1.6s ease-in-out infinite; }
+/* It never rests with the rest of the bar (main.css). It starts voice mode; while on, it is only tinted, to show it is on:
+   stopping is done from the arch itself. */
+.topbar__voice[aria-pressed="true"] { color: var(--text); background: rgba(38, 37, 30, 0.07); }
 @media (max-width: 760px) { .topbar__voice { display: none; } }   /* a phone has the button at the foot instead */
 
 /* ——— the mic at the foot of the screen: phones only ——— */
 @media (min-width: 761px) { body .voice-dock { display: none; } }   /* (body: so it outranks the button's own rules below) */
+body.voice-on .voice-dock { display: none; }   /* on, the stop is in the arch */
 
 
 /* At the foot of the screen, in the middle: over the gap between the two columns, level with the update box. */
@@ -37,19 +34,6 @@ body:has(.voice[data-state="thinking"]) .topbar__voice[aria-pressed="true"] { an
 .voice-dock__label, .voice-dock__stop { display: none; }
 /* A modal open over a quiet page: the mic steps aside until it's closed. */
 body:has(#overlay > .overlay):not(.voice-on) .voice-dock { opacity: 0; pointer-events: none; }
-
-/* On: the mic becomes the way to stop. A firmer outline, a small square, and a ring that follows your voice. */
-body.voice-on .voice-dock { color: var(--text); background: var(--bg); width: 52px; padding: 0;
-  box-shadow: inset 0 0 0 1.5px var(--text), 0 0 0 calc(3px + var(--voice-level, 0) * 12px) rgba(var(--voice-glow-rgb), 0.08); }
-body.voice-on .voice-dock .icon, body.voice-on .voice-dock svg { display: none; }
-body.voice-on .voice-dock__stop { display: block; width: 14px; height: 14px; border-radius: 3px; background: currentColor; }
-body.voice-on .voice-dock__label { display: none; }
-/* While it works on what you said, the ring breathes: no words needed. */
-.voice[data-state="thinking"] ~ .voice-dock { animation: voice-dock-wait 1.6s ease-in-out infinite; }
-@keyframes voice-dock-wait {
-  0%, 100% { box-shadow: inset 0 0 0 1.5px var(--text), 0 0 0 3px rgba(var(--voice-glow-rgb), 0.06); }
-  50%      { box-shadow: inset 0 0 0 1.5px var(--text), 0 0 0 10px rgba(var(--voice-glow-rgb), 0.10); }
-}
 
 /* ——— the bar: as tall as what is in it ——— */
 /* A long transcript or reply makes it grow upward, never out of its own backdrop. The top 72px is the fade (paint
@@ -86,11 +70,26 @@ body.voice-on .voice-dock__label { display: none; }
 .voice__undo:hover { color: var(--text); }
 .voice__undo[hidden] { display: none; }
 
+/* ——— stop: a small ring at the foot of the arch, with a square in it ——— */
+.voice__stop { pointer-events: auto; flex: none; width: 34px; height: 34px; margin-top: 10px; padding: 0; border: none; border-radius: 50%; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text-2); -webkit-tap-highlight-color: transparent;
+  box-shadow: inset 0 0 0 1px rgba(38, 37, 30, 0.35), 0 0 0 calc(2px + var(--voice-level, 0) * 10px) rgba(var(--voice-glow-rgb), 0.08);
+  transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease; }
+.voice__stop span { width: 10px; height: 10px; border-radius: 2.5px; background: currentColor; }
+.voice__stop:hover { color: var(--text); box-shadow: inset 0 0 0 1px var(--text), 0 0 0 calc(2px + var(--voice-level, 0) * 10px) rgba(var(--voice-glow-rgb), 0.08); }
+.voice__stop:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+/* While it works on what you said, the ring breathes: no words needed. */
+.voice[data-state="thinking"] .voice__stop { animation: voice-dock-wait 1.6s ease-in-out infinite; }
+@keyframes voice-dock-wait {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(38, 37, 30, 0.35), 0 0 0 2px rgba(var(--voice-glow-rgb), 0.06); }
+  50%      { box-shadow: inset 0 0 0 1px rgba(38, 37, 30, 0.5), 0 0 0 9px rgba(var(--voice-glow-rgb), 0.10); }
+}
+
 /* ——— the ring of light ——— */
 /* An arch standing on the mic, around the words: clear in the middle where the words are, a ring of light just
    outside them, nothing beyond. voice.js sizes it to the words, so a longer answer makes a bigger arch (it eases
    there), and its light rises a little with your voice (--voice-level). */
-.voice__arc { position: absolute; left: 50%; bottom: calc(var(--dock-zone) - 40px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+.voice__arc { position: absolute; left: 50%; bottom: calc(var(--dock-zone) - 34px + env(safe-area-inset-bottom)); transform: translateX(-50%);
   width: var(--arc-w, 560px); height: var(--arc-h, 240px); pointer-events: none;
   background: radial-gradient(ellipse 50% 100% at 50% 100%,
     rgba(var(--voice-glow-rgb), 0) 0%, rgba(var(--voice-glow-rgb), 0) 66%,
@@ -110,10 +109,9 @@ body.voice-on .voice-dock__label { display: none; }
 .voice[data-state="listening"] .voice__edge { border-color: rgba(var(--voice-glow-rgb), calc(0.10 + var(--voice-level, 0) * 0.12)); }
 
 @media (prefers-reduced-motion: reduce) {
-  body:has(.voice[data-state="thinking"]) .topbar__voice[aria-pressed="true"] { animation: none; }
   .voice, .voice__heard.is-new, .voice__reply.is-new, .voice__arc, .voice.is-done .voice__arc, .voice[data-state="thinking"] .voice__arc { animation: none; }
-  .voice__arc, .voice-dock { transition: none; }
-  .voice[data-state="thinking"] ~ .voice-dock { animation: none; }
+  .voice__arc, .voice-dock, .voice__stop { transition: none; }
+  .voice[data-state="thinking"] .voice__stop { animation: none; }
 }
 
 /* — usage: what voice has cost against its limit (Settings). A hairline bar, the way the rest of Settings draws things. — */
@@ -126,7 +124,6 @@ body.voice-on .voice-dock__label { display: none; }
 
 /* — phones: the mic is a labelled pill until voice mode is on, targets a thumb can hit, the reply a size down — */
 @media (max-width: 760px) {
-  :root { --dock-zone: 88px; }   /* the button's room */
   .voice-dock { width: auto; padding: 0 24px 0 20px; bottom: calc(18px + env(safe-area-inset-bottom)); }
   .voice-dock__label { display: inline; }
   body.voice-on .voice-dock { width: 52px; padding: 0; }

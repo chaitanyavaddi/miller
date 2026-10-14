@@ -51,6 +51,8 @@ class VoiceCommand(models.Model):
                     text += f' to {o["place"]}' + (f' #{o["anchor_id"]}' if o.get("anchor_id") else f' {o["position"]}' if o.get("position") else "")
                 elif o["op"] == "open":
                     text += f' {o["target"]}'
+                elif o["op"] == "schedule":
+                    text += f' on {o["date"]}' + (f' at {o["time"]}' if o.get("time") else "")
                 return text
             return "; ".join(step(o) for o in self.applied) + (" (then undone)" if self.undone_at else "")
         if self.outcome == self.Outcome.ASKED:

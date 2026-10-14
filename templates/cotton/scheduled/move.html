@@ -1,11 +1,11 @@
-<c-vars row months weekdays action />
+<c-vars row months weekdays action reminding="" />
 {% comment %}Move to…: one row of the Scheduled tab. The todo's title, its date (the same chip and calendar),
-Save. "Once" is set and not shown; the same todo, thread and all, comes back that day. scheduled.js runs it.{% endcomment %}
+Save. Today with a time is a reminder (it stays on the list); a later day moves it. "Once" is set and not shown; the same todo, thread and all, comes back that day. scheduled.js runs it.{% endcomment %}
 <div class="overlay">
   <button type="button" class="overlay__scrim" aria-label="Close" data-action="overlay-close"></button>
   <div class="scheduled scheduled--move" role="dialog" aria-modal="true" aria-labelledby="move-title" data-scheduled data-move>
     <div class="timeline__bar">
-      <span class="eyebrow timeline__title" id="move-title">Move to</span>
+      <span class="eyebrow timeline__title" id="move-title">Remind me, or move to</span>
       <c-ui.icon-button label="Close" title="Close" class="icon-btn--small timeline__close" data-action="overlay-close"><c-ui.icon name="x" size="14" /></c-ui.icon-button>
     </div>
     <c-ui.messages />
@@ -18,7 +18,7 @@ Save. "Once" is set and not shown; the same todo, thread and all, comes back tha
     <p class="form-message form-message--error scheduled__error" data-error role="alert" hidden></p>
     <form class="scheduled__foot" data-save-form hx-post="{{ action }}" hx-swap="none">
       {% csrf_token %}
-      <span class="scheduled__summary" data-summary></span>
+      <span class="scheduled__summary" data-summary>{% if reminding %}<button type="button" class="text-btn text-btn--small" hx-post="{{ action }}" hx-vals='{"clear": "1"}' hx-swap="none">Clear reminder</button>{% endif %}</span>
       <button type="submit" class="scheduled__save">Save</button>
     </form>
   </div>

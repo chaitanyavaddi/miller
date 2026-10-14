@@ -33,6 +33,8 @@
 .todo-row__when { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); min-width: 36px; height: 36px; flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 /* From Scheduled: a small clock just before the age, not instead of it. */
 .todo-row__sched { flex: none; display: flex; align-items: center; color: var(--text-4); margin-right: -8px; }
+.todo-row__bell { flex: none; display: flex; align-items: center; gap: 4px; color: var(--text-3); }
+.todo-row__bell-time { font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }   /* a reminder is set (delivery comes later) */
 .todo-row__age { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); width: 36px; text-align: right; flex: none; }
 .todo-row__age > svg { display: inline-block; vertical-align: -2px; }  /* the alarm, in the age's place */
 .todo-row:hover .todo-row__title { color: var(--text); }
@@ -62,11 +64,11 @@
 .notice--shown { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .notice { transition: none; } }
 
-/* — done today: it stays where it stands, so nothing below moves, and the others keep their numbers.
-     A dark tick takes its number's place; the title, age and alarm step back (even selected). — */
-.todo-row--closed .todo-row__pos,
+/* — done today: it stays where it stands, so nothing below moves, and every row keeps its number (a voice can say "number
+     three"). The title and age step back (even selected); the tick on the right says it's done, and turns into reopen. — */
+.todo-row--closed .todo-row__pos { color: var(--text-4); }
 .todo-row--closed .todo-row__age,
-.todo-row--closed .todo-row__sched { color: var(--border); }  /* number, age, alarm: all past now; only the tick stays dark */
+.todo-row--closed .todo-row__sched, .todo-row--closed .todo-row__bell { color: var(--border); }
 .todo-row--closed .todo-row__title,
 .todo-row--closed:hover .todo-row__title,
 .todo-row--closed.todo-row--current .todo-row__title { color: var(--text-4); opacity: 0.6; font-weight: 400; }
@@ -77,14 +79,13 @@
   display: flex; align-items: center; justify-content: flex-end; opacity: 0; }
 .todo-row:hover .todo-row__tick, .todo-row__tick:focus-visible { opacity: 1; }
 .todo-row__tick:hover { color: var(--text); }
-/* Done: the tick in the number's place, dark; hovered, it turns into reopen. */
-.todo-row__done { position: absolute; left: 0; top: 0; width: 44px; height: 36px; padding: 0; background: none; border: none; cursor: pointer;
-  color: var(--text); display: flex; align-items: center; }
-.todo-row__done > span { display: flex; }
-.todo-row__done--fixed { cursor: default; pointer-events: none; }  /* a meeting's: shown, not clicked */
-.todo-row__tick-reopen { display: none !important; }
-.todo-row__done:is(:hover, :focus-visible) .todo-row__tick-done { display: none !important; }
-.todo-row__done:is(:hover, :focus-visible) .todo-row__tick-reopen { display: flex !important; }
+/* Done: its tick stays, dark; hovered, it turns into reopen. */
+.todo-row__tick--done { opacity: 1; color: var(--text); }
+.todo-row__tick--done > span { display: flex; }
+.todo-row__tick--reopen .tick-reopen { display: none; }
+.todo-row__tick--reopen:is(:hover, :focus-visible) .tick-done { display: none; }
+.todo-row__tick--reopen:is(:hover, :focus-visible) .tick-reopen { display: flex; }
+span.todo-row__tick--done { cursor: default; }   /* an ended meeting's: shown, not clicked */
 
 /* — done rows: the last few closed todos end the list, quieter than the active ones — */
 .todo-row:not(.todo-row--done) + .todo-row--done { margin-top: 8px; }

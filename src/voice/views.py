@@ -4,6 +4,7 @@ import time
 from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.views import View
 
 from accounts.mixins import SignedInRequiredMixin
@@ -86,7 +87,7 @@ class VoiceCommandView(SignedInRequiredMixin, View):
         open_id = whole(request.headers.get("X-Voice-Open", ""))   # the thread on screen: what "this one" means
         try:
             decision, command.decide_ms = DecisionService.decide(
-                command.transcript, todos, history, notes=CommandService.notes_for(todos), open_id=open_id, done_earlier=done_earlier)
+                command.transcript, todos, history, notes=CommandService.notes_for(todos), open_id=open_id, done_earlier=done_earlier, today=timezone.localdate())
         except DecisionError:
             return finish("Couldn't work that out. Try again.", VoiceCommand.Outcome.FAILED)
         command.model, command.llm_cost = decision.model, decision.cost

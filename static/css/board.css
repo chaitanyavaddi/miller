@@ -12,6 +12,8 @@
 .thread__actions { position: relative; display: flex; align-items: center; gap: 8px; }
 .thread__done-btn { display: inline-flex; align-items: center; color: var(--text-3); }
 .thread__done-btn:hover { color: var(--text); }
+.thread__remind { color: var(--text-4); }
+.thread__remind:hover, .thread__remind--set { color: var(--text); }
 .thread__more { color: var(--text-4); }
 .thread__more:hover, .thread__more[aria-expanded="true"] { color: var(--text); }
 .thread-menu { top: 28px; width: 200px; }

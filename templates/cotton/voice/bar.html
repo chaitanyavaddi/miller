@@ -8,9 +8,11 @@
     <p class="voice__heard" id="voice-heard" aria-live="off"></p>
     <p class="voice__reply" id="voice-reply" role="status" aria-live="polite"></p>
     <p class="voice__meta" hidden><span class="voice__hint" id="voice-hint"></span><button type="button" class="voice__undo" id="voice-undo" hidden>Undo</button></p>
+    {# The way to stop is here, at the foot of the arch, where you are looking. The mic in the top bar is only for starting. #}
+    <button type="button" class="voice__stop" id="voice-stop" data-action="voice-toggle" aria-label="Stop voice mode" title="Stop (Esc)"><span aria-hidden="true"></span></button>
   </div>
 </div>
 {# The way into voice mode and out of it: at the foot of the screen, between the two typing boxes, where a hand rests. #}
 <button type="button" class="voice-dock" id="voice-dock" data-action="voice-toggle" aria-label="Voice mode" title="Voice mode (V)" aria-pressed="false" aria-keyshortcuts="v">
-  <c-ui.icon name="mic" size="20" sw="1.7" /><span class="voice-dock__stop" aria-hidden="true"></span><span class="voice-dock__label">Voice</span>
+  <c-ui.icon name="mic" size="20" sw="1.7" /><span class="voice-dock__label">Voice</span>
 </button>

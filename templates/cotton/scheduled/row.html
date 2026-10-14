@@ -14,6 +14,9 @@
       </span>
       <button type="button" class="scheduled-chip{% if not row.day_label %} scheduled-chip--empty{% endif %}" data-pop="monthday" data-detail="monthly" aria-haspopup="dialog"{% if row.rhythm != "monthly" %} hidden{% endif %}><span data-label="monthday">{{ row.day_label|default:'day' }}</span><span class="scheduled-chip__caret" aria-hidden="true">▾</span></button>
     </span>
+    <span class="scheduled-row__at" title="Optional. With a time, a reminder is set for it on the day.">
+      <input type="time" class="scheduled-row__time" data-at-time value="{{ row.at_time|default:'' }}" aria-label="Time (optional)">
+    </span>
   </div>
   <span class="todo-row__actions">
     <button type="button" class="todo-row__action" data-remove aria-label="Remove" title="Remove"><c-ui.icon name="trash" size="13" sw="1.6" /></button>

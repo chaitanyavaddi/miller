@@ -89,9 +89,9 @@ class BoardTests(TestCase):
         html = response.content.decode()
         self.assertIn("todo-row--closed", html)
         self.assertLess(html.index("todo 1"), html.index("todo 2"))               # nothing moved
-        self.assertIn('class="todo-row__done" aria-label="todo 1: done — reopen"', html)   # its tick, in its number's place
-        self.assertIn('<span class="todo-row__pos">02</span>', html)        # closing one changes no one's number
-        self.assertIn('<span class="todo-row__pos"></span>', html)          # the done one shows its tick instead
+        self.assertIn('class="todo-row__tick todo-row__tick--done todo-row__tick--reopen" aria-label="todo 1: done — reopen"', html)   # its tick, on the right
+        self.assertIn('<span class="todo-row__pos">01</span>', html)        # the done one keeps its number…
+        self.assertIn('<span class="todo-row__pos">02</span>', html)        # …and closing it changes no one's
         self.assertIn('aria-label="Mark todo 2 done"', html)
         thread = self.client.get(self.url("todo-detail", self.todos[0])).content.decode()
         self.assertIn("Done today</b>", thread)                                        # done, not a number or its age
@@ -321,7 +321,7 @@ class MeetingBoardTests(TestCase):
         midnight = TodoService.start_of_today()
         ended = Todo.objects.create(user=self.user, kind=Todo.Kind.MEETING, title="Earlier sync", starts_at=midnight, ends_at=midnight + timedelta(seconds=1))
         page = self.client.get(reverse("board:index")).content.decode()
-        self.assertIn('class="todo-row__done todo-row__done--fixed"', page)
+        self.assertIn('class="todo-row__tick todo-row__tick--done" title="Ended"', page)
         self.assertNotIn(f'hx-post="{reverse("board:todo-reopen", args=[ended.id])}"', page)
 
     def test_a_meeting_cannot_be_closed_or_renamed(self):

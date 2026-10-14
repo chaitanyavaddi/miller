@@ -53,12 +53,14 @@ class ProductionService:
         claimed = ScheduledItem.objects.filter(pk=item.pk, last_produced_on=item.last_produced_on).update(last_produced_on=today)
         if not claimed:
             return None
-        if item.todo_id:  # a moved todo: the same one comes back, thread and all
-            ScheduleService.bring_back(item, "Back on today's list")
+        if item.todo_id:  # a moved todo: the same one comes back, thread and all (with its reminder, if it has a time)
+            ScheduleService.bring_back(item, "Back on today's list", remind=True)
             return item.todo
         todo = None
         if not TodoService.open_for(item.user).filter(scheduled_item=item).exists():
             todo = TodoService.produce(item.user, item.title, item, today)
+            if item.at_time:   # the day's reminder
+                Todo.objects.filter(pk=todo.pk).update(notify_at=ScheduleService.moment(today, item.at_time))
             CommentService.note(todo, f"From Scheduled · {rhythm.label(item, today)}")
         if item.rhythm == ScheduledItem.Rhythm.ONCE:
             item.delete()

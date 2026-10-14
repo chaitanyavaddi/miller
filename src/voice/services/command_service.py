@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import date, time, timedelta
 from types import SimpleNamespace
 
 from django.db import transaction
@@ -8,6 +8,9 @@ from django.utils.dateparse import parse_datetime
 
 from comments.models import Comment
 from comments.service import CommentService
+from scheduled.models import ScheduledItem
+from scheduled.rhythm import clock_label, once_limit
+from scheduled.services import ScheduleService
 from todos.models import Todo
 from todos.schemas import TITLE_MAX_LENGTH, TodoReopenSchema, TodoTitleSchema
 from todos.services import TodoService
@@ -103,6 +106,12 @@ class CommandService:
                 if todo is None or todo.is_meeting or not todo.closed_at:
                     problems.append("a done todo to reopen")
                     continue
+            elif operation.op == Op.SCHEDULE:
+                todo = by_id.get(operation.todo_id) or earlier.get(operation.todo_id)
+                reason = CommandService._schedule_problem(operation, todo, text)
+                if reason:
+                    problems.append(reason)
+                    continue
             elif operation.op == Op.END:
                 if ended:
                     continue
@@ -149,8 +158,80 @@ class CommandService:
             if operation.op == Op.CLOSE:
                 closing.add(todo.id)
             valid.append(Operation(operation.op, todo.id if todo else None, text or None, operation.place,
-                                   operation.anchor_id, operation.position, operation.comment_id, operation.target))
+                                   operation.anchor_id, operation.position, operation.comment_id, operation.target, operation.date, operation.time))
         return valid, problems
+
+    @staticmethod
+    def _when(operation: Operation) -> tuple[date | None, time | None, bool]:
+        """The day and time an operation names, and whether they could be read (a time is optional)."""
+        try:
+            day = date.fromisoformat(operation.date or "")
+            at = time.fromisoformat(operation.time).replace(second=0, microsecond=0, tzinfo=None) if operation.time else None
+        except ValueError:
+            return None, None, False
+        return day, at, True
+
+    @staticmethod
+    def _schedule_problem(operation: Operation, todo: Todo | None, text: str) -> str:
+        """Why a todo can't be put on that day (and time), or "" if it can."""
+        day, at, readable = CommandService._when(operation)
+        if not readable or day is None:
+            return "a day and a time I could read"
+        today = timezone.localdate()
+        if operation.todo_id is not None:
+            if todo is None:
+                return "a todo that isn't on the list"
+            if todo.is_meeting:
+                return f"{quote(todo.title)} can't be scheduled"
+        elif not text or len(text) > TITLE_MAX_LENGTH:
+            return "a todo needs a title under 300 characters"
+        if day < today:
+            return "that day has already passed"
+        if day > once_limit(today):
+            return "a day within the next year"
+        if day == today:
+            if todo is not None and at is None and not todo.closed_at:
+                return f"{quote(todo.title)} is already on today's list"
+            if at is not None and ScheduleService.moment(day, at) <= timezone.now():
+                return "that time has already passed"
+        return ""
+
+    @staticmethod
+    def _schedule(user, operation: Operation, result: "Applied") -> Todo | None:
+        """Put a todo on a day (and time): an existing one moves there and returns that day, with a reminder if it has a
+        time; today with a time is just a reminder; a new one is scheduled (or, for today, simply added)."""
+        day, at, _ = CommandService._when(operation)
+        today, when = timezone.localdate(), ScheduleService.when_words(date.fromisoformat(operation.date), at)
+        if operation.todo_id is not None:
+            todo = Todo.objects.get(pk=operation.todo_id, user=user)
+            if todo.closed_at:   # asking for it again means it's open again, whether it was done today or long ago
+                was = todo.closed_at
+                TodoService.reopen(todo, TodoReopenSchema(index=TodoService.ordered_for(user).count() + 1, select=False))
+                result.undo.append({"op": "restore_closed", "id": todo.id, "at": was.isoformat()})
+                if day == today and at is None:
+                    result.lines.append(f"Reopened {quote(todo.title)}")
+                    return todo
+            previous = todo.notify_at.isoformat() if todo.notify_at else None
+            if day == today:   # already here: only the reminder
+                Todo.objects.filter(pk=todo.pk).update(notify_at=ScheduleService.moment(day, at))
+                result.lines.append(f"Reminder set for {quote(todo.title)} at {clock_label(at)}")
+                result.undo.append({"op": "notify", "id": todo.id, "at": previous})
+            else:
+                ScheduleService.move(todo, day, at)
+                result.lines.append(f"Moved {quote(todo.title)} to {when}")
+                result.undo.append({"op": "unmove", "id": todo.id, "notify_at": previous})
+            return todo
+        if day == today:
+            todo = TodoService.create(user, TodoTitleSchema(title=operation.text))
+            if at is not None:
+                Todo.objects.filter(pk=todo.pk).update(notify_at=ScheduleService.moment(day, at))
+            result.lines.append(f"Added {quote(todo.title)}" + (f" · reminder {clock_label(at)}" if at else ""))
+            result.undo.append({"op": "delete", "id": todo.id})
+            return todo
+        item = ScheduledItem.objects.create(user=user, title=operation.text, rhythm=ScheduledItem.Rhythm.ONCE, on_date=day, at_time=at)
+        result.lines.append(f"Scheduled {quote(operation.text)} for {when}")
+        result.undo.append({"op": "delete_scheduled", "id": item.id})
+        return None
 
     @staticmethod
     def _move_problem(operation: Operation, todo: Todo, by_id: dict) -> str:
@@ -189,6 +270,8 @@ class CommandService:
                 else:
                     result.lines.append("Closed the panel" if operation.target == Target.CLOSE_PANEL else f"Opened {OPENED[operation.target]}")
                     result.go = {"to": operation.target}
+            elif operation.op == Op.SCHEDULE:
+                todo = CommandService._schedule(user, operation, result)
             elif operation.op in (Op.EDIT_UPDATE, Op.DELETE_UPDATE):
                 note = Comment.objects.select_related("todo").get(pk=operation.comment_id, todo__user=user)
                 todo, extra = note.todo, {"comment_id": note.id}
@@ -268,6 +351,9 @@ class CommandService:
             if kind == "reorder":
                 TodoService.reorder(user, SimpleNamespace(ids=step["ids"]))
                 continue
+            if kind == "delete_scheduled":
+                ScheduledItem.objects.filter(pk=step["id"], user=user).delete()
+                continue
             if kind == "comment_body":
                 Comment.objects.filter(pk=step["id"], todo__user=user).update(body=step["body"], updated_at=timezone.now())
                 continue
@@ -287,6 +373,11 @@ class CommandService:
                 TodoService.reopen(todo, TodoReopenSchema(index=step["index"], select=False))
             elif kind == "restore_closed":
                 TodoService.restore_closed(todo, parse_datetime(step["at"]))
+            elif kind == "unmove":
+                ScheduleService.unmove(todo)
+                Todo.objects.filter(pk=todo.pk).update(notify_at=parse_datetime(step["notify_at"]) if step.get("notify_at") else None)
+            elif kind == "notify":
+                Todo.objects.filter(pk=todo.pk).update(notify_at=parse_datetime(step["at"]) if step.get("at") else None)
             elif kind == "rename":
                 TodoService.rename(todo, TodoTitleSchema(title=step["title"]))
         command.undone_at = timezone.now()

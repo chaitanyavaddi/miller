@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, time
 
 from django.contrib import messages
 from django.utils import timezone
@@ -21,6 +21,7 @@ class ScheduledChange:
     on_date: date | None
     weekdays: list[int]
     month_day: int | None
+    at_time: time | None = None   # optional: a reminder at this time on the day
 
 
 @dataclass
@@ -33,6 +34,7 @@ class ScheduledSaveSchema:
     def from_post(cls, request) -> "ScheduledSaveSchema":
         POST = request.POST
         columns = [POST.getlist(name) for name in ("row_id", "row_removed", "row_title", "row_rhythm", "row_on_date", "row_weekdays", "row_month_day")]
+        columns.append((POST.getlist("row_at_time") + [""] * len(columns[0]))[:len(columns[0])])   # the time is optional: a missing one is "no time"
         changes = [
             ScheduledChange(
                 id=int(row_id) if row_id.isdigit() else None,
@@ -42,8 +44,9 @@ class ScheduledSaveSchema:
                 on_date=cls._date(on_date.strip()),
                 weekdays=sorted({int(d) for d in weekdays.split(",") if d.strip().isdigit() and 0 <= int(d) <= 6}),
                 month_day=int(month_day) if month_day.strip().isdigit() else None,
+                at_time=cls._time(at_time.strip()),
             )
-            for row_id, removed, title, rhythm, on_date, weekdays, month_day in zip(*columns)
+            for row_id, removed, title, rhythm, on_date, weekdays, month_day, at_time in zip(*columns)
         ]
         obj = cls(changes=changes)
         obj._request = request
@@ -53,6 +56,14 @@ class ScheduledSaveSchema:
     def _date(raw: str) -> date | None:
         try:
             return date.fromisoformat(raw) if raw else None
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _time(raw: str) -> time | None:
+        """"15:30" (what a time box sends), to the minute; blank or unreadable is no time."""
+        try:
+            return time.fromisoformat(raw).replace(second=0, microsecond=0, tzinfo=None) if raw else None
         except ValueError:
             return None
 
@@ -98,19 +109,29 @@ class ScheduledSaveSchema:
 
 @dataclass
 class MoveSchema:
-    """Moving a todo to a later date: from tomorrow up to the furthest day a once item can be."""
+    """Reminding or moving a todo: today needs a time that hasn't passed (a reminder, it stays); a later day, up to the furthest a
+    once item can be, moves it, at a time if one is given."""
     on_date: date | None
+    at_time: time | None = None
 
     @classmethod
     def from_post(cls, request) -> "MoveSchema":
         raw = request.POST.get("row_on_date") or request.POST.get("on_date") or ""  # the row's Save sends row_on_date
-        obj = cls(on_date=ScheduledSaveSchema._date(raw.strip()))
+        at = request.POST.get("row_at_time") or request.POST.get("at_time") or ""
+        obj = cls(on_date=ScheduledSaveSchema._date(raw.strip()), at_time=ScheduledSaveSchema._time(at.strip()))
         obj._request = request
         return obj
 
     def is_valid(self) -> bool:
         today = timezone.localdate()
-        if self.on_date is None or not (today < self.on_date <= once_limit(today)):
-            messages.error(self._request, "Pick a day from tomorrow on.")
+        if self.on_date is None or not (today <= self.on_date <= once_limit(today)):
+            messages.error(self._request, "Pick today, or a day after it.")
             return False
+        if self.on_date == today:
+            if self.at_time is None:
+                messages.error(self._request, "Pick a time for today's reminder.")
+                return False
+            if timezone.make_aware(datetime.combine(today, self.at_time)) <= timezone.now():
+                messages.error(self._request, "That time has already passed.")
+                return False
         return True

@@ -28,6 +28,7 @@ class BoardRow:
     event_url: str = ""     # a meeting's event in its calendar: the row links out to it
     from_schedule: bool = False  # Scheduled produced it today: a clock marks the row
     schedule_label: str = ""     # its rhythm, while the scheduled item is there: "every day"
+    reminder: str = ""           # when a reminder is due, as the row says it (3pm, tmrw 9am): a bell marks the row
     is_done: bool = False        # done today: still in its place
 
     @property
@@ -87,6 +88,7 @@ class BoardService:
             is_done=todo.closed_at is not None,
             from_schedule=todo.produced_on == today,
             schedule_label=rhythm.label(todo.scheduled_item, today) if todo.scheduled_item else "",
+            reminder=reminders.when(todo.notify_at) if todo.notify_at else "",
         )
 
     @staticmethod

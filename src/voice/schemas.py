@@ -13,11 +13,12 @@ class Op:
     ADD_UPDATE = "add_update"
     MOVE       = "move"
     REOPEN     = "reopen"          # a done todo, not done again
+    SCHEDULE   = "schedule"        # a todo to another day (and time), or a new one for a day
     OPEN       = "open"            # go somewhere on screen
     EDIT_UPDATE   = "edit_update"      # change a note on a thread
     DELETE_UPDATE = "delete_update"    # remove one
     END        = "end"             # they're finished: close voice mode
-    ALL = (CREATE, RENAME, CLOSE, ADD_UPDATE, MOVE, REOPEN, OPEN, EDIT_UPDATE, DELETE_UPDATE, END)
+    ALL = (CREATE, RENAME, CLOSE, ADD_UPDATE, MOVE, REOPEN, SCHEDULE, OPEN, EDIT_UPDATE, DELETE_UPDATE, END)
 
 
 class Target:
@@ -42,6 +43,8 @@ class Operation:
     position: int | None = None    # move only: the number it ends up at, as the list shows it
     comment_id: int | None = None  # edit_update and delete_update: the note
     target: str | None = None      # open only: a Target
+    date: str | None = None        # schedule only: the day, YYYY-MM-DD
+    time: str | None = None        # schedule only: the time of day, HH:MM (24h), or none
 
     def as_dict(self) -> dict:
         data = {"op": self.op, "todo_id": self.todo_id, "text": self.text}
@@ -51,6 +54,8 @@ class Operation:
             data["comment_id"] = self.comment_id
         elif self.op == Op.OPEN:
             data["target"] = self.target
+        elif self.op == Op.SCHEDULE:
+            data.update(date=self.date, time=self.time)
         return data
 
 

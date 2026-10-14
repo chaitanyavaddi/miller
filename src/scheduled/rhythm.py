@@ -1,7 +1,7 @@
 """When a scheduled item falls, and how that reads. Pure date logic: no queries, no zones (the
 caller passes the user's local dates)."""
 import calendar
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 
 from scheduled.models import ScheduledItem
 
@@ -71,12 +71,20 @@ def next_due(item, start: date) -> date | None:
     return None
 
 
+def clock_label(moment: time) -> str:
+    """3pm, 9am, 10:30am: minutes only when there are some."""
+    minutes = f":{moment.minute:02d}" if moment.minute else ""
+    return f"{moment.hour % 12 or 12}{minutes}{'am' if moment.hour < 12 else 'pm'}"
+
+
 def label(item, today: date) -> str:
-    """once · 23 oct, every mo, th, every day (all seven), monthly · 1st."""
+    """once · 23 oct, every mo, th, every day (all seven), monthly · 1st; with its time after, if it has one: once · 23 oct · 3pm."""
     if item.rhythm == Rhythm.ONCE:
-        return f"once · {item.on_date.day} {MONTH_SHORT[item.on_date.month - 1]}" if item.on_date else "once"
-    if item.rhythm == Rhythm.WEEKLY and len(item.weekday_list) == 7:
-        return "every day"
-    if item.rhythm == Rhythm.WEEKLY:
-        return "every " + ", ".join(WEEKDAY_SHORT[d] for d in item.weekday_list) if item.weekday_list else "weekly"
-    return f"monthly · {ordinal(item.month_day)}" if item.month_day else "monthly"
+        base = f"once · {item.on_date.day} {MONTH_SHORT[item.on_date.month - 1]}" if item.on_date else "once"
+    elif item.rhythm == Rhythm.WEEKLY and len(item.weekday_list) == 7:
+        base = "every day"
+    elif item.rhythm == Rhythm.WEEKLY:
+        base = "every " + ", ".join(WEEKDAY_SHORT[d] for d in item.weekday_list) if item.weekday_list else "weekly"
+    else:
+        base = f"monthly · {ordinal(item.month_day)}" if item.month_day else "monthly"
+    return f"{base} · {clock_label(item.at_time)}" if item.at_time else base

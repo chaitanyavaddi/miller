@@ -173,9 +173,9 @@
   }
 
   function renumber() {
-    /* Every row counts toward the numbers, done ones too (their tick stands in for theirs), so closing one moves no one's. */
+    /* Every row counts toward the numbers, done ones too, and shows its number, so closing one moves no one's. */
     document.querySelectorAll(`#rows ${ACTIVE}`).forEach((row, i) => {
-      if (!row.classList.contains('todo-row--closed')) row.querySelector('.todo-row__pos').textContent = String(i + 1).padStart(2, '0');
+      row.querySelector('.todo-row__pos').textContent = String(i + 1).padStart(2, '0');
     });
   }
 

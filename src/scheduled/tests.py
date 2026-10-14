@@ -231,7 +231,33 @@ class MoveTests(TestCase):
         self.assertContains(modal, 'value="Renew the domain"')
         self.assertContains(modal, 'data-rhythm="once"')
         self.assertContains(modal, 'data-panel="date"')
-        self.assertContains(modal, 'class="popover__day is-today" disabled')  # not today: that isn't a move
+        self.assertNotContains(modal, 'class="popover__day is-today" disabled')  # today can be picked: with a time it's a reminder
+        self.assertNotContains(modal, "Clear reminder")
+
+    def test_today_with_a_time_is_a_reminder_that_stays_on_the_list(self):
+        later = (timezone.localtime() + timedelta(hours=2)).replace(second=0, microsecond=0)
+        if later.date() != timezone.localdate():
+            self.skipTest("too near midnight")
+        post = {"row_on_date": timezone.localdate().isoformat(), "row_at_time": later.strftime("%H:%M")}
+        self.assertIn("overlay-close", self.client.post(reverse("scheduled:move", args=[self.first.id]), post)["HX-Trigger"])
+        self.first.refresh_from_db()
+        self.assertEqual(self.first.notify_at, later)
+        self.assertFalse(ScheduledItem.objects.exists())
+        self.assertEqual(len(TodoService.listed_for(self.user)), 2)
+        modal = self.client.get(reverse("scheduled:move", args=[self.first.id]))   # shows it, with a way to clear it
+        self.assertContains(modal, f'value="{later.strftime("%H:%M")}"')
+        self.assertContains(modal, "Clear reminder")
+        self.client.post(reverse("scheduled:move", args=[self.first.id]), {"clear": "1"})
+        self.first.refresh_from_db()
+        self.assertIsNone(self.first.notify_at)
+
+    def test_today_needs_a_time_that_has_not_passed(self):
+        today = timezone.localdate().isoformat()
+        for post in ({"row_on_date": today}, {"row_on_date": today, "row_at_time": "00:00"}):
+            response = self.client.post(reverse("scheduled:move", args=[self.first.id]), post)
+            self.assertNotIn("HX-Trigger", response)
+        self.first.refresh_from_db()
+        self.assertIsNone(self.first.notify_at)
 
     def test_a_moved_todo_leaves_today_and_its_thread_says_so(self):
         response = self.move(self.thursday)
@@ -272,3 +298,109 @@ class MoveTests(TestCase):
     def test_today_or_the_past_is_refused(self):
         self.move(timezone.localdate())
         self.assertFalse(ScheduledItem.objects.exists())
+
+
+class TimeOfDayTests(TestCase):
+    """A schedule can have a time, optional. A day alone puts the todo on that day's list; a time as well sets a reminder
+    for it, shown as a bell. (Delivering the reminder is not built yet.)"""
+
+    def setUp(self):
+        self.user = IdentityService.create_user("t@x.com", timezone="UTC")
+        self.client.force_login(self.user)
+        self.todo = TodoService.create(self.user, TodoTitleSchema(title="Call the dentist"))
+        self.friday = timezone.localdate() + timedelta(days=3)
+
+    def move(self, **post):
+        return self.client.post(reverse("scheduled:move", args=[self.todo.id]), {"row_on_date": self.friday.isoformat(), **post})
+
+    def come_back(self):
+        with patch("django.utils.timezone.localdate", return_value=self.friday):
+            ProductionService.produce_due(self.user)
+        self.todo.refresh_from_db()
+
+    def test_a_time_is_optional_and_a_day_alone_sets_no_reminder(self):
+        self.move()
+        self.assertIsNone(ScheduledItem.objects.get().at_time)
+        self.come_back()
+        self.assertIsNone(self.todo.notify_at)
+        self.assertEqual(list(TodoService.listed_for(self.user)), [self.todo])   # it is on the list that day either way
+
+    def test_a_time_comes_back_with_the_todo_as_a_reminder_at_that_time_on_that_day(self):
+        self.move(row_at_time="15:30")
+        self.assertEqual(ScheduledItem.objects.get().at_time, time(15, 30))
+        self.assertEqual(self.todo.comments.filter(automatic=True).first().body, f"Moved to {ScheduleService.short_date(self.friday)} · 3:30pm")
+        self.come_back()
+        self.assertEqual(timezone.localtime(self.todo.notify_at).strftime("%Y-%m-%d %H:%M"), f"{self.friday:%Y-%m-%d} 15:30")
+        self.assertEqual(list(TodoService.listed_for(self.user)), [self.todo])
+
+    def test_the_reminder_is_in_the_users_own_zone(self):
+        self.user.timezone = "Asia/Kolkata"
+        self.user.save()
+        with timezone.override("Asia/Kolkata"):
+            self.move(row_at_time="09:00")
+            self.come_back()
+        self.assertEqual(timezone.localtime(self.todo.notify_at, timezone.get_fixed_timezone(330)).strftime("%H:%M"), "09:00")
+
+    def test_a_garbled_time_is_no_time(self):
+        self.move(row_at_time="soon")
+        self.assertIsNone(ScheduledItem.objects.get().at_time)
+
+    def test_the_bell_and_when_show_on_the_row_and_in_the_thread(self):
+        self.move(row_at_time="15:00")
+        self.come_back()
+        with patch("django.utils.timezone.localdate", return_value=self.friday):
+            page = self.client.get(reverse("board:index")).content.decode()
+        self.assertIn('class="todo-row__bell"', page)
+        self.assertIn("reminder 3pm", page)
+
+    def test_a_todo_without_a_reminder_has_no_bell(self):
+        self.assertNotIn("todo-row__bell", self.client.get(reverse("board:index")).content.decode())
+
+    def test_a_recurring_item_with_a_time_makes_each_days_todo_with_that_days_reminder(self):
+        item = ScheduledItem.objects.create(user=self.user, title="stand-up notes", rhythm=Rhythm.WEEKLY, weekdays="0,1,2,3,4,5,6", at_time=time(9, 0))
+        ScheduledItem.objects.filter(pk=item.pk).update(created_at=timezone.now() - timedelta(days=5))
+        with patch("scheduled.services.production_service.timezone.localdate", return_value=MONDAY):
+            made = ProductionService.produce_due(self.user)
+        self.assertEqual(timezone.localtime(Todo.objects.get(pk=made[0].pk).notify_at).strftime("%Y-%m-%d %H:%M"), "2026-10-12 09:00")
+        self.assertIn("From Scheduled · every day · 9am", made[0].comments.first().body)
+
+    def test_the_modal_saves_a_time_with_a_new_item_and_reads_it_back(self):
+        self.client.post(reverse("scheduled:save"), {"row_id": [""], "row_removed": [""], "row_title": ["water the plants"], "row_rhythm": ["weekly"],
+                                                     "row_on_date": [""], "row_weekdays": ["0,3"], "row_month_day": [""], "row_at_time": ["07:45"]})
+        item = ScheduledItem.objects.get(title="water the plants")
+        self.assertEqual(item.at_time, time(7, 45))
+        modal = self.client.get(reverse("scheduled:index"))
+        self.assertContains(modal, 'value="07:45"')
+        self.assertEqual(rhythm.label(item, MONDAY), "every mo, th · 7:45am")
+
+    def test_clearing_the_time_in_the_modal_removes_it(self):
+        item = ScheduledItem.objects.create(user=self.user, title="water", rhythm=Rhythm.WEEKLY, weekdays="0", at_time=time(7, 45))
+        self.client.post(reverse("scheduled:save"), {"row_id": [item.id], "row_removed": [""], "row_title": ["water"], "row_rhythm": ["weekly"],
+                                                     "row_on_date": [""], "row_weekdays": ["0"], "row_month_day": [""], "row_at_time": [""]})
+        self.assertIsNone(ScheduledItem.objects.get(pk=item.pk).at_time)
+
+    def test_a_moved_todos_time_can_change_in_the_modal_and_says_so_in_its_thread(self):
+        self.move()
+        item = ScheduledItem.objects.get()
+        self.client.post(reverse("scheduled:save"), {"row_id": [item.id], "row_removed": [""], "row_title": [item.title], "row_rhythm": ["once"],
+                                                     "row_on_date": [self.friday.isoformat()], "row_weekdays": [""], "row_month_day": [""], "row_at_time": ["18:00"]})
+        self.assertEqual(ScheduledItem.objects.get().at_time, time(18, 0))
+        self.assertTrue(self.todo.comments.filter(body=f"Moved to {ScheduleService.short_date(self.friday)} · 6pm").exists())
+
+    def test_bringing_a_moved_todo_back_early_sets_no_reminder(self):
+        self.move(row_at_time="15:30")
+        item = ScheduledItem.objects.get()
+        self.client.post(reverse("scheduled:save"), {"row_id": [item.id], "row_removed": ["1"], "row_title": [item.title], "row_rhythm": ["once"],
+                                                     "row_on_date": [self.friday.isoformat()], "row_weekdays": [""], "row_month_day": [""], "row_at_time": [""]})
+        self.todo.refresh_from_db()
+        self.assertIsNone(self.todo.notify_at)
+
+    def test_unmoving_puts_it_back_in_its_place_and_forgets_the_note(self):
+        other = TodoService.create(self.user, TodoTitleSchema(title="Other"))
+        self.move(row_at_time="15:30")
+        self.assertTrue(ScheduleService.unmove(Todo.objects.get(pk=self.todo.pk)))
+        self.assertEqual([t.title for t in TodoService.listed_for(self.user)], ["Call the dentist", "Other"])
+        self.assertFalse(ScheduledItem.objects.exists())
+        self.assertFalse(self.todo.comments.exists())
+        self.assertFalse(ScheduleService.unmove(self.todo))   # nothing left to take back
+        self.assertEqual(other.pk, Todo.objects.get(title="Other").pk)

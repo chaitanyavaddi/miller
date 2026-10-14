@@ -37,6 +37,7 @@
   const dock = document.getElementById('voice-dock');                 /* the button at the foot (phones) */
   const mic = document.querySelector('.topbar__voice');               /* the one in the top bar (everywhere else) */
   const buttons = [mic, dock].filter(Boolean);
+  const stopButton = document.getElementById('voice-stop');           /* inside the arch: how it stops */
   const arc = bar.querySelector('.voice__arc');
   const stage = bar.querySelector('.voice__stage');
   const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -94,7 +95,7 @@
   }
 
   /* The arch of light stands round the words: wide and tall enough that they sit in its clear middle, so a longer
-     answer makes a bigger arch (it eases there, voice.css). The words' own width, not the box they could fill. */
+     answer makes a bigger arch (it eases there, voice.css). The words' own width, not the box they could fill. 20: the stop below them. */
   const textWidth = el => {
     if (!el.textContent) return 0;
     const range = document.createRange();
@@ -106,7 +107,7 @@
     const box = stage.getBoundingClientRect();
     if (!box.width) return;
     /* The answer sets the size; what was said, small and quiet, counts for less. 44: the gap down to the mic. */
-    const w = Math.max(textWidth(reply), textWidth(heard) * 0.75, 240), h = box.height + 44;
+    const w = Math.max(textWidth(reply), textWidth(heard) * 0.75, 240), h = box.height + 20;
     bar.style.setProperty('--arc-w', `${Math.round(Math.min(w * 2, innerWidth * 1.4))}px`);
     bar.style.setProperty('--arc-h', `${Math.round(Math.max(h * 1.9, 190))}px`);
   }
@@ -353,6 +354,7 @@
     const text = value.toFixed(2);
     bar.style.setProperty('--voice-level', text);
     buttons.forEach(b => b.style.setProperty('--voice-level', text));
+    stopButton.style.setProperty('--voice-level', text);   /* the ring round the stop follows your voice */
   }
 
   /* ———————————————————————— start where it was left ———————————————————————— */
