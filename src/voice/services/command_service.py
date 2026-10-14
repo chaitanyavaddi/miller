@@ -107,7 +107,6 @@ class CommandService:
                     problems.append("a done todo to reopen")
                     continue
             elif operation.op == Op.SCHEDULE:
-                todo = by_id.get(operation.todo_id) or earlier.get(operation.todo_id)
                 reason = CommandService._schedule_problem(operation, todo, text)
                 if reason:
                     problems.append(reason)
@@ -181,6 +180,8 @@ class CommandService:
         if operation.todo_id is not None:
             if todo is None:
                 return "a todo that isn't on the list"
+            if todo.closed_at:
+                return f"{quote(todo.title)} is done: reopen it first"
             if todo.is_meeting:
                 return f"{quote(todo.title)} can't be scheduled"
         elif not text or len(text) > TITLE_MAX_LENGTH:
@@ -190,7 +191,7 @@ class CommandService:
         if day > once_limit(today):
             return "a day within the next year"
         if day == today:
-            if todo is not None and at is None and not todo.closed_at:
+            if todo is not None and at is None:
                 return f"{quote(todo.title)} is already on today's list"
             if at is not None and ScheduleService.moment(day, at) <= timezone.now():
                 return "that time has already passed"
@@ -204,13 +205,6 @@ class CommandService:
         today, when = timezone.localdate(), ScheduleService.when_words(date.fromisoformat(operation.date), at)
         if operation.todo_id is not None:
             todo = Todo.objects.get(pk=operation.todo_id, user=user)
-            if todo.closed_at:   # asking for it again means it's open again, whether it was done today or long ago
-                was = todo.closed_at
-                TodoService.reopen(todo, TodoReopenSchema(index=TodoService.ordered_for(user).count() + 1, select=False))
-                result.undo.append({"op": "restore_closed", "id": todo.id, "at": was.isoformat()})
-                if day == today and at is None:
-                    result.lines.append(f"Reopened {quote(todo.title)}")
-                    return todo
             previous = todo.notify_at.isoformat() if todo.notify_at else None
             if day == today:   # already here: only the reminder
                 Todo.objects.filter(pk=todo.pk).update(notify_at=ScheduleService.moment(day, at))

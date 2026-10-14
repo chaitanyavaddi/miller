@@ -15,6 +15,10 @@ Save. Today with a time is a reminder (it stays on the list); a later day moves 
       <c-scheduled.calendar :months="months" draft="1" />
     </div>
 
+    <div class="popover popover--calendar popover--time" data-panel="time" role="dialog" aria-label="Time" hidden>
+      <c-scheduled.clock />
+    </div>
+
     <p class="form-message form-message--error scheduled__error" data-error role="alert" hidden></p>
     <form class="scheduled__foot" data-save-form hx-post="{{ action }}" hx-swap="none">
       {% csrf_token %}

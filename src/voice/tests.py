@@ -379,7 +379,7 @@ class DoneTodoTests(VoiceBase):
         todos = CommandService.todos_for(self.user)
         prompt = DecisionService.build_body("reopen it", todos, [], "m", done_earlier=CommandService.done_earlier(self.user))["messages"][1]["content"]
         self.assertIn(f"#{self.acme.id} [task, done] (number 1) Acme follow-up", prompt)
-        self.assertIn(f"Done earlier (only reopen or schedule apply):\n#{self.old.id} Check Dubai flights", prompt)
+        self.assertIn(f"Done earlier (only reopen applies):\n#{self.old.id} Check Dubai flights", prompt)
         self.assertNotIn("Done earlier", DecisionService.build_body("hi", todos, [], "m")["messages"][1]["content"])
 
 
@@ -694,29 +694,13 @@ class ScheduleByVoiceTests(VoiceBase):
             self.assertEqual((valid, len(problems)), ([], 1), (day, at))
         self.assertFalse(ScheduledItem.objects.exists())
 
-    def test_a_done_todo_is_reopened_and_scheduled_and_undo_closes_it_again(self):
+    def test_a_done_todo_is_refused_until_it_is_reopened(self):
         TodoService.close(self.acme)
-        _, problems, applied = self.run_ops(self.schedule(self.acme, at="15:00"))
-        self.assertEqual(problems, [])
-        self.assertIsNone(Todo.objects.get(pk=self.acme.id).closed_at)
-        self.assertEqual(ScheduledItem.objects.get().todo_id, self.acme.id)
-        self.undo(applied)
-        self.assertIsNotNone(Todo.objects.get(pk=self.acme.id).closed_at)
+        for at, day in (("15:00", self.friday), (None, self.friday), ("23:59", self.today)):
+            valid, problems, _ = self.run_ops(self.schedule(self.acme, day=day, at=at))
+            self.assertEqual((valid, problems), ([], ["“Acme follow-up” is done: reopen it first"]))
         self.assertFalse(ScheduledItem.objects.exists())
-
-    def test_asking_for_a_reminder_on_a_done_todo_reopens_it_and_sets_it(self):
-        later = (timezone.localtime() + timedelta(hours=2)).replace(second=0, microsecond=0)
-        if later.date() != self.today:
-            self.skipTest("too near midnight")
-        TodoService.close(self.acme)
-        _, problems, applied = self.run_ops(self.schedule(self.acme, day=self.today, at=later.strftime("%H:%M")))
-        self.assertEqual(problems, [])
-        todo = Todo.objects.get(pk=self.acme.id)
-        self.assertEqual((todo.closed_at, todo.notify_at), (None, later))
-        self.undo(applied)
-        todo.refresh_from_db()
-        self.assertIsNotNone(todo.closed_at)
-        self.assertIsNone(todo.notify_at)
+        self.assertIsNotNone(Todo.objects.get(pk=self.acme.id).closed_at)
 
     def test_only_a_task_that_is_open_and_yours_can_be_moved(self):
         other = TodoService.create(IdentityService.create_user("o@x.com"), TodoTitleSchema(title="theirs"))

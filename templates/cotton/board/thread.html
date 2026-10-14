@@ -33,7 +33,7 @@
       {# Drawn exactly as the account menu: its frame, its section, its text buttons. #}
       <div class="account-menu thread-menu" id="thread-menu" role="menu">
         <div class="account-menu__section">
-          <c-ui.text-button class="account-menu__action" role="menuitem" hx-get="{% url 'scheduled:move' current.id %}" hx-target="#overlay" hx-swap="innerHTML">Remind or move…</c-ui.text-button>
+          {% if not current.is_done %}<c-ui.text-button class="account-menu__action" role="menuitem" hx-get="{% url 'scheduled:move' current.id %}" hx-target="#overlay" hx-swap="innerHTML">Remind or move…</c-ui.text-button>{% endif %}
           <c-ui.text-button class="account-menu__action" role="menuitem" hx-post="{% url 'board:todo-delete' current.id %}" hx-include="#board-state" hx-target="#workspace" hx-swap="outerHTML">Delete</c-ui.text-button>
         </div>
       </div>

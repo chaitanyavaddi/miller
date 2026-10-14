@@ -245,11 +245,17 @@ class MoveTests(TestCase):
         self.assertFalse(ScheduledItem.objects.exists())
         self.assertEqual(len(TodoService.listed_for(self.user)), 2)
         modal = self.client.get(reverse("scheduled:move", args=[self.first.id]))   # shows it, with a way to clear it
-        self.assertContains(modal, f'value="{later.strftime("%H:%M")}"')
+        self.assertContains(modal, f'data-at-time="{later.strftime("%H:%M")}"')
         self.assertContains(modal, "Clear reminder")
         self.client.post(reverse("scheduled:move", args=[self.first.id]), {"clear": "1"})
         self.first.refresh_from_db()
         self.assertIsNone(self.first.notify_at)
+
+    def test_a_done_todo_cannot_be_reminded_or_moved(self):
+        TodoService.close(self.first)
+        self.assertEqual(self.client.get(reverse("scheduled:move", args=[self.first.id])).status_code, 404)
+        self.assertEqual(self.move(self.thursday).status_code, 404)
+        self.assertFalse(ScheduledItem.objects.exists())
 
     def test_today_needs_a_time_that_has_not_passed(self):
         today = timezone.localdate().isoformat()
@@ -370,7 +376,7 @@ class TimeOfDayTests(TestCase):
         item = ScheduledItem.objects.get(title="water the plants")
         self.assertEqual(item.at_time, time(7, 45))
         modal = self.client.get(reverse("scheduled:index"))
-        self.assertContains(modal, 'value="07:45"')
+        self.assertContains(modal, 'data-at-time="07:45"')
         self.assertEqual(rhythm.label(item, MONDAY), "every mo, th · 7:45am")
 
     def test_clearing_the_time_in_the_modal_removes_it(self):

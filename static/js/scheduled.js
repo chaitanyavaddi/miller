@@ -8,6 +8,7 @@
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
   const dateLabel = iso => { const [y, m, d] = iso.split('-').map(Number); return `${ordinal(d)} ${MONTHS[m - 1]}, ${y}`; };
+  const clockLabel = hhmm => { const [h, m] = hhmm.split(':').map(Number); return `${h % 12 || 12}${m ? ':' + String(m).padStart(2, '0') : ''}${h < 12 ? 'am' : 'pm'}`; };
   const modal = () => document.querySelector('#overlay [data-scheduled]');
   const FIELDS = ['rhythm', 'onDate', 'weekdays', 'monthDay', 'atTime'];
   const DETAIL = { once: ['date', 'onDate'], monthly: ['monthday', 'monthDay'] };  /* the picker each rhythm needs next */
@@ -15,8 +16,7 @@
   /* — a row's state — */
   function state(row) {
     const d = row.dataset;
-    const at = row.querySelector('[data-at-time]');
-    return { title: row.querySelector('.scheduled-row__input').value.trim(), rhythm: d.rhythm, onDate: d.onDate, weekdays: d.weekdays, monthDay: d.monthDay, atTime: at ? at.value : '' };
+    return { title: row.querySelector('.scheduled-row__input').value.trim(), rhythm: d.rhythm, onDate: d.onDate, weekdays: d.weekdays, monthDay: d.monthDay, atTime: d.atTime || '' };
   }
 
   function remember(row) {  /* how it opened, to tell what changed */
@@ -33,6 +33,7 @@
     set('rhythm', d.rhythm || 'when', !d.rhythm);
     set('date', d.onDate ? dateLabel(d.onDate) : 'date', !d.onDate);
     set('monthday', d.monthDay ? ordinal(Number(d.monthDay)) : 'day', !d.monthDay);
+    set('time', d.atTime ? clockLabel(d.atTime) : 'time', !d.atTime);
     row.querySelectorAll('[data-detail]').forEach(el => { el.hidden = el.dataset.detail !== d.rhythm; });
     const days = (d.weekdays || '').split(',').filter(Boolean);
     row.querySelectorAll('[data-weekday]').forEach(b => {
@@ -88,6 +89,10 @@
     panel.querySelectorAll('[data-pick-rhythm]').forEach(b => b.classList.toggle('is-on', b.dataset.pickRhythm === d.rhythm));
     panel.querySelectorAll('[data-pick-date]').forEach(b => b.classList.toggle('is-on', b.dataset.pickDate === d.onDate));
     panel.querySelectorAll('[data-pick-month-day]').forEach(b => b.classList.toggle('is-on', b.dataset.pickMonthDay === d.monthDay));
+    const [hh, mm] = (d.atTime || ':').split(':').map(Number);
+    panel.querySelectorAll('[data-pick-hour]').forEach(b => b.classList.toggle('is-on', d.atTime && Number(b.dataset.pickHour) === (hh % 12 || 12)));
+    panel.querySelectorAll('[data-pick-minute]').forEach(b => b.classList.toggle('is-on', d.atTime && Number(b.dataset.pickMinute) === mm));
+    panel.querySelectorAll('[data-pick-meridiem]').forEach(b => b.classList.toggle('is-on', d.atTime && b.dataset.pickMeridiem === (hh < 12 ? 'am' : 'pm')));
     const panes = [...panel.querySelectorAll('[data-month-pane]')];
     if (panes.length) {  /* the row's month, else this one */
       const month = (d.onDate || '').slice(0, 7);
@@ -113,6 +118,31 @@
     summarise();
     const next = DETAIL[row.dataset.rhythm];
     if (next && !row.dataset[next[1]]) openPanel(row.querySelector(`[data-pop="${next[0]}"]`));
+    else if (modal().matches('[data-move]') && row.dataset.onDate && !row.dataset.atTime && next && next[0] === 'date') openPanel(row.querySelector('[data-pop="time"]'));  /* Remind or move: the day, then its time */
+  }
+
+  /* A time is built from three picks (hour, minute, am/pm); each writes the row at once, filling what's still missing. */
+  function setClock(row, change) {
+    const [h24, m] = (row.dataset.atTime || '').split(':').map(Number);
+    let hour = row.dataset.atTime ? h24 % 12 || 12 : null, minute = row.dataset.atTime ? m : 0;
+    let pm = row.dataset.atTime ? h24 >= 12 : null;
+    ({ hour = hour, minute = minute, pm = pm } = change);
+    if (hour === null) hour = 9;
+    if (pm === null) pm = hour === 12 || hour <= 6;  /* 3 means the afternoon, 9 the morning */
+    row.dataset.atTime = `${String((hour % 12) + (pm ? 12 : 0)).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    render(row);
+    hideError();
+    summarise();
+    openRefresh();
+  }
+
+  function openRefresh() {  /* keep the picker's highlights in step with the row */
+    if (!open) return;
+    const { panel, row } = open;
+    const [hh, mm] = row.dataset.atTime.split(':').map(Number);
+    panel.querySelectorAll('[data-pick-hour]').forEach(b => b.classList.toggle('is-on', Number(b.dataset.pickHour) === (hh % 12 || 12)));
+    panel.querySelectorAll('[data-pick-minute]').forEach(b => b.classList.toggle('is-on', Number(b.dataset.pickMinute) === mm));
+    panel.querySelectorAll('[data-pick-meridiem]').forEach(b => b.classList.toggle('is-on', b.dataset.pickMeridiem === (hh < 12 ? 'am' : 'pm')));
   }
 
   /* — what's missing before Save can go — */
@@ -199,6 +229,10 @@
     }
     if (d.pickRhythm) { const v = d.pickRhythm; pick(ds => { ds.rhythm = v; }); return; }
     if (d.pickDate) { const v = d.pickDate; pick(ds => { ds.onDate = v; }); return; }
+    if (d.pickHour) { setClock(open.row, { hour: Number(d.pickHour) }); return; }
+    if (d.pickMinute) { const row = open.row; setClock(row, { minute: Number(d.pickMinute) }); closePanel(); return; }
+    if (d.pickMeridiem) { setClock(open.row, { pm: d.pickMeridiem === 'pm' }); return; }
+    if (d.pickNoTime !== undefined) { const row = open.row; row.dataset.atTime = ''; render(row); closePanel(); hideError(); summarise(); return; }
     if (d.pickMonthDay) { const v = d.pickMonthDay; pick(ds => { ds.monthDay = v; }); return; }
     if (d.weekday) {
       const row = t.closest('[data-row]');

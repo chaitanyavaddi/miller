@@ -1,7 +1,7 @@
 <c-vars row="" weekdays="" />
 {# One scheduled todo: its state lives in its data-* and title box, saved only by Save. Blank, it's the template for a new one. #}
 <div class="todo-row scheduled-row" data-row data-id="{{ row.id|default:'' }}"
-     data-rhythm="{{ row.rhythm|default:'' }}" data-on-date="{{ row.on_date|default:'' }}" data-weekdays="{{ row.weekdays|default:'' }}" data-month-day="{{ row.month_day|default:'' }}">
+     data-rhythm="{{ row.rhythm|default:'' }}" data-on-date="{{ row.on_date|default:'' }}" data-weekdays="{{ row.weekdays|default:'' }}" data-month-day="{{ row.month_day|default:'' }}" data-at-time="{{ row.at_time|default:'' }}">
   <div class="scheduled-row__title">
     <input type="text" class="scheduled-row__input" value="{{ row.title|default:'' }}" maxlength="300" autocomplete="off" aria-label="Title" placeholder="Name it"{% if row.moved %} readonly title="Moved from today's list: it comes back with its thread"{% endif %}>
   </div>
@@ -15,7 +15,7 @@
       <button type="button" class="scheduled-chip{% if not row.day_label %} scheduled-chip--empty{% endif %}" data-pop="monthday" data-detail="monthly" aria-haspopup="dialog"{% if row.rhythm != "monthly" %} hidden{% endif %}><span data-label="monthday">{{ row.day_label|default:'day' }}</span><span class="scheduled-chip__caret" aria-hidden="true">▾</span></button>
     </span>
     <span class="scheduled-row__at" title="Optional. With a time, a reminder is set for it on the day.">
-      <input type="time" class="scheduled-row__time" data-at-time value="{{ row.at_time|default:'' }}" aria-label="Time (optional)">
+      <button type="button" class="scheduled-chip scheduled-chip--empty" data-pop="time" aria-haspopup="dialog"><span data-label="time">time</span><span class="scheduled-chip__caret" aria-hidden="true">▾</span></button>
     </span>
   </div>
   <span class="todo-row__actions">

@@ -33,6 +33,10 @@
       <p class="popover__note">In a shorter month, its last day.</p>
     </div>
 
+    <div class="popover popover--calendar popover--time" data-panel="time" role="dialog" aria-label="Time" hidden>
+      <c-scheduled.clock />
+    </div>
+
     <p class="form-message form-message--error scheduled__error" data-error role="alert" hidden></p>
     <form class="scheduled__foot" data-save-form hx-post="{% url 'scheduled:save' %}" hx-swap="none">
       {% csrf_token %}
