@@ -1,4 +1,8 @@
 <header class="home__nav">
-  <a class="home__brand" href="{% url 'board:home' %}" aria-label="Miller"><c-ui.logo /></a>
+  <a class="home__brand" href="{% url 'board:home' %}?stay=1" aria-label="Miller"><c-ui.logo /></a>
+  {% if request.user.is_authenticated and not request.user.is_guest %}
+  <a class="home__signin" href="{% url 'board:index' %}">Open Miller</a>
+  {% else %}
   <a class="home__signin" href="{% url 'accounts:login' %}">Sign in</a>
+  {% endif %}
 </header>

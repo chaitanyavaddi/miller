@@ -122,6 +122,31 @@ class EventParsingTests(TestCase):
         self.assertIsNone(MicrosoftCalendarApi.fields({**item, "isAllDay": True}))
         self.assertIsNone(MicrosoftCalendarApi.fields({**item, "responseStatus": {"response": "declined"}}))
 
+    def test_only_meetings_come_in_not_blocks_on_the_calendar(self):
+        block = {**google_item("e", self.start, "Deep work"), "hangoutLink": ""}   # nobody else, no call
+        for kind in ("focusTime", "outOfOffice", "workingLocation", "birthday", "fromGmail"):
+            self.assertIsNone(GoogleCalendarApi.fields(google_item("e", self.start, eventType=kind)), kind)
+        self.assertIsNone(GoogleCalendarApi.fields(block))
+        self.assertIsNone(GoogleCalendarApi.fields({**block, "attendees": [{"self": True, "responseStatus": "accepted"}, {"email": "room@x.com", "resource": True}]}))
+        self.assertIsNotNone(GoogleCalendarApi.fields({**block, "attendees": [{"self": True}, {"email": "priya@x.com"}]}))   # someone else: a meeting
+        self.assertIsNotNone(GoogleCalendarApi.fields(google_item("e", self.start)))                                       # a Meet link: a meeting
+
+    def test_google_links_open_in_the_calendars_own_account(self):
+        item = google_item("e", self.start)
+        fields = GoogleCalendarApi.fields(item, account="me@work.com")
+        self.assertEqual(fields.meeting_url, "https://meet.google.com/abc-defg-hij?authuser=me%40work.com")
+        self.assertEqual(fields.event_url, "https://www.google.com/calendar/event?eid=e&authuser=me%40work.com")
+        zoom = GoogleCalendarApi.fields({**item, "hangoutLink": "", "location": "https://acme.zoom.us/j/123"}, account="me@work.com")
+        self.assertEqual(zoom.meeting_url, "https://acme.zoom.us/j/123")   # not Google's: left alone
+        self.assertEqual(GoogleCalendarApi.fields(item).meeting_url, "https://meet.google.com/abc-defg-hij")
+
+    def test_outlook_blocks_stay_out_too(self):
+        item = {"id": "o1", "subject": "Lunch", "isAllDay": False, "isCancelled": False,
+                "start": {"dateTime": "2026-10-12T09:00:00"}, "end": {"dateTime": "2026-10-12T09:30:00"}}
+        self.assertIsNone(MicrosoftCalendarApi.fields(item))
+        self.assertIsNone(MicrosoftCalendarApi.fields({**item, "attendees": [{"type": "required"}], "showAs": "oof"}))
+        self.assertIsNotNone(MicrosoftCalendarApi.fields({**item, "attendees": [{"type": "required", "emailAddress": {"address": "a@x.com"}}]}))
+
 
 class MeetingSyncTests(CalendarTestCase):
     def test_an_event_becomes_a_meeting_at_its_time(self):

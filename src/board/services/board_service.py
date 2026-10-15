@@ -69,7 +69,7 @@ class BoardService:
             position=position,
             age=InsightsService.days_between(todo.created_at, now),
             kind=todo.kind,
-            when=reminders.clock(todo.starts_at) if todo.is_meeting and todo.starts_at else "",
+            when=reminders.clock_full(todo.starts_at) if todo.is_meeting and todo.starts_at else "",
             span=f"{reminders.exact(todo.starts_at)} – {reminders.clock(todo.ends_at)}" if todo.is_meeting and todo.ends_at else "",
             meeting_url=todo.meeting_url,
             starts_iso=todo.starts_at.isoformat() if todo.is_meeting and todo.starts_at else "",

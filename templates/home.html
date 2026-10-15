@@ -14,7 +14,7 @@
 
   <main class="home__hero">
     <h1 class="home__title">Today, in order.<span class="home__title-more"> Your todos and meetings in one list. Nothing else.</span></h1>
-    <a class="text-btn home__try" href="{% url 'board:index' %}">Try it, no account needed</a>
+    <a class="text-btn home__try" href="{% url 'board:index' %}">{% if request.user.is_authenticated and not request.user.is_guest %}Back to your list{% else %}Try it, no account needed{% endif %}</a>
   </main>
 
   <c-site.footer />

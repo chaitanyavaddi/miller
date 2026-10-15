@@ -33,6 +33,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "accounts.middleware.KeepSignedInMiddleware",
     "accounts.middleware.TimezoneMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
@@ -58,8 +59,11 @@ TEMPLATES = [{
     },
 }]
 
-# Google is the only way in: no password validators, no password routes. A User row
-# has an unusable password, so even a stray form post could not authenticate one.
+# Two ways in: Google, or a 6-digit code emailed to the address (accounts.services.CodeService). No passwords: a User
+# row has an unusable one, so even a stray form post could not authenticate one.
+# Sign-in codes go out through Resend (https://resend.com). Without a key, codes are logged instead (dev only).
+RESEND_API_KEY = env("RESEND_API_KEY", "")
+MAIL_FROM = env("MAIL_FROM", "Miller <hello@updates.miller.so>")
 AUTH_USER_MODEL = "accounts.User"
 AUTHENTICATION_BACKENDS = [
     "rules.permissions.ObjectPermissionBackend",
@@ -110,7 +114,10 @@ SITE_URL = env("SITE_URL", "http://localhost:8000").rstrip("/")
 # Google sign-in on an account flagged with `manage.py make_staff`, so this is one lock of two.
 ADMIN_URL = env("ADMIN_URL", "admin/").strip("/") + "/"
 
-SESSION_COOKIE_AGE = 60 * 60 * 24 * 365  # a guest's identity is this cookie
+# Signed in stays signed in: the cookie lasts 400 days (the most browsers keep one), and KeepSignedInMiddleware moves
+# that on at most once a day while someone keeps using Miller, so only a year of not coming back signs them out.
+# A guest's identity is this cookie too.
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 400
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = env("TIME_ZONE", "UTC")

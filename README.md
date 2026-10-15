@@ -34,6 +34,8 @@ Settings: `config/settings/dev.py` (reads `.env.dev`) and `prod.py` (reads real 
 | `SITE_URL` | always | `http://localhost:8000` locally, `https://miller.so` in prod. Push webhooks need https. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | sign-in, calendars | Google OAuth client (below). |
 | `CALENDAR_TOKEN_KEY` | calendars | Encrypts calendar tokens. Make once, **never change** (everyone would have to reconnect):<br>`uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+| `RESEND_API_KEY` | email sign-in | Resend (https://resend.com) API key: sends the 6-digit sign-in codes (sign in with Google, or with a code emailed to you; no passwords). Without it, production offers only Google; in dev the codes are logged to the console. |
+| `MAIL_FROM` | optional | Sender of those emails (default `Miller <hello@updates.miller.so>`); its domain must be verified in Resend. |
 | `GROQ_API_KEY` | voice notes, call recordings | Groq console. |
 | `GROQ_MODEL` | optional | `whisper-large-v3` (default) or `whisper-large-v3-turbo` (cheaper). |
 | `OPENROUTER_API_KEY` | voice mode | OpenRouter key. Without it (or Groq's), voice mode isn't offered. |
@@ -58,6 +60,8 @@ Settings: `config/settings/dev.py` (reads `.env.dev`) and `prod.py` (reads real 
 - Auth Platform → Audience: **In production** (in Testing, tokens die after 7 days).
 - Data access: only `calendar.events.readonly` (plus email, profile, openid). Verification needs a privacy page (`/privacy/`), terms (`/terms/`), verified domain, and a demo video.
 - Calendar push notifications need nothing extra: Miller registers them itself (https only).
+
+**Resend** (https://resend.com): add the sending domain (updates.miller.so, verified) and its DNS records once, then an API key → `RESEND_API_KEY`. Only sign-in codes are sent.
 
 **Groq** (https://console.groq.com): API key → `GROQ_API_KEY`. Whisper transcribes voice notes (≤1 min, nothing kept) and call recordings (audio deleted after). Free tier ~2 h audio/hour.
 
@@ -120,7 +124,7 @@ In Dokploy, run these from the app's Terminal without `uv run`.
 
 | App | Holds |
 |---|---|
-| `accounts` | users, guests, Google sign-in |
+| `accounts` | users, guests, sign-in (Google, or a code emailed to you); sessions last 400 days, moved on daily while used |
 | `todos` | the ordered list, meetings' place in it |
 | `comments` | threads (updates), links |
 | `board` | the main screen, settings, home and legal pages' routes |

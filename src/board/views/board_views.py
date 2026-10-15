@@ -15,10 +15,11 @@ from utils.view_helper import redirect_to
 
 
 class HomeView(View):
-    """The front door: what Miller is, with the real board below to try. Members go straight to their list."""
+    """The front door: what Miller is, with the real board below to try. Members go straight to their list, unless
+    they came by the app's logo (?stay=1)."""
 
     def get(self, request):
-        if request.user.is_authenticated and not request.user.is_guest:
+        if request.user.is_authenticated and not request.user.is_guest and request.GET.get("stay") != "1":
             return redirect_to(request, "board:index")
         return render(request, "home.html")
 

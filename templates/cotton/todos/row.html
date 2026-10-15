@@ -4,7 +4,7 @@
     <span class="todo-row__pos">{{ row.position|pad2 }}</span>
     <span id="todo-title-{{ row.id }}" class="todo-row__title">{{ row.title }}</span>
     {% if row.is_meeting %}
-    <span class="todo-row__when" title="From your calendar · read only"><c-ui.icon name="calendar" size="12" sw="1.6" />{{ row.when }}</span>
+    <span class="todo-row__when" title="From your calendar · read only"><c-ui.icon name="calendar" size="12" sw="1.6" /><span class="todo-row__when-time">{{ row.when }}</span></span>
     {% else %}
     {# A reminder is set for it: a bell, and when. #}
     {% if row.reminder %}<span class="todo-row__bell" title="Reminder · {{ row.reminder }}"><c-ui.icon name="bell" size="13" sw="1.6" /><span class="todo-row__bell-time">{{ row.reminder }}</span></span>{% endif %}
@@ -14,9 +14,14 @@
     {% endif %}
   </button>
   {% comment %}The tick column, right of the age. An open row: hover it to tick it done. A done one: its tick stays (the number keeps its place,
-     so a voice can still say "number three"); hovered, the tick turns into reopen. An ended meeting shows the tick and nothing to reopen.{% endcomment %}
+     so a voice can still say "number three"); hovered, the tick turns into reopen. An ended meeting shows the tick; hovered, it turns into a link out to the calendar.{% endcomment %}
   <span class="todo-row__actions">
-    {% if row.is_meeting and row.event_url %}
+    {% if row.is_meeting and row.is_done and row.event_url %}
+    <a class="todo-row__tick todo-row__tick--done todo-row__tick--swap" href="{{ row.event_url }}" target="_blank" rel="noopener" aria-label="{{ row.title }}: ended — open in your calendar" title="Ended · open in calendar">
+      <span class="tick-done"><c-ui.icon name="check" size="14" sw="2" /></span>
+      <span class="tick-reopen"><c-ui.icon name="out" size="13" sw="1.8" /></span>
+    </a>
+    {% elif row.is_meeting and row.event_url %}
     <a class="todo-row__tick todo-row__out" href="{{ row.event_url }}" target="_blank" rel="noopener" aria-label="Open {{ row.title }} in your calendar" title="Open in calendar">
       <c-ui.icon name="out" size="13" sw="1.8" />
     </a>

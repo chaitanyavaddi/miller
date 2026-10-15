@@ -470,6 +470,15 @@ class HomeTests(TestCase):
         self.client.force_login(IdentityService.create_user("m@x.com"))
         self.assertRedirects(self.client.get("/"), reverse("board:index"), fetch_redirect_response=False)
 
+    def test_a_member_reaches_the_home_page_by_the_logo_and_finds_the_way_back(self):
+        self.client.force_login(IdentityService.create_user("m@x.com"))
+        self.assertRedirects(self.client.get(reverse("board:home")), reverse("board:index"), fetch_redirect_response=False)
+        page = self.client.get(reverse("board:home"), {"stay": "1"})
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Open Miller")
+        self.assertContains(page, "Back to your list")
+        self.assertContains(self.client.get(reverse("board:index")), f'href="{reverse("board:home")}?stay=1"')
+
     def test_the_old_home_address_moves_to_the_root(self):
         self.assertRedirects(self.client.get("/home/"), "/", status_code=301, fetch_redirect_response=False)
 

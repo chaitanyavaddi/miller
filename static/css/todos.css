@@ -31,6 +31,7 @@
 .todo-row__pos { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-4); width: 44px; flex: none; }
 .todo-row__title { font-size: 13.5px; font-weight: 400; color: var(--text-3); flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
 .todo-row__when { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); min-width: 36px; height: 36px; flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.todo-row__when-time { width: 8ch; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }   /* 10:00 am and 8:30 pm the same width: icons and times line up */
 /* From Scheduled: a small clock just before the age, not instead of it. */
 .todo-row__sched { flex: none; display: flex; align-items: center; color: var(--text-4); margin-right: -8px; }
 .todo-row__bell { flex: none; display: flex; align-items: center; gap: 4px; color: var(--text-3); }
@@ -82,9 +83,10 @@
 /* Done: its tick stays, dark; hovered, it turns into reopen. */
 .todo-row__tick--done { opacity: 1; color: var(--text); }
 .todo-row__tick--done > span { display: flex; }
-.todo-row__tick--reopen .tick-reopen { display: none; }
-.todo-row__tick--reopen:is(:hover, :focus-visible) .tick-done { display: none; }
-.todo-row__tick--reopen:is(:hover, :focus-visible) .tick-reopen { display: flex; }
+.todo-row__tick--done { display: flex; align-items: center; justify-content: center; }
+:is(.todo-row__tick--reopen, .todo-row__tick--swap) .tick-reopen { display: none; }
+:is(.todo-row__tick--reopen, .todo-row__tick--swap):is(:hover, :focus-visible) .tick-done { display: none; }
+:is(.todo-row__tick--reopen, .todo-row__tick--swap):is(:hover, :focus-visible) .tick-reopen { display: flex; }
 span.todo-row__tick--done { cursor: default; }   /* an ended meeting's: shown, not clicked */
 
 /* — done rows: the last few closed todos end the list, quieter than the active ones — */

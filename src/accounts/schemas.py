@@ -3,6 +3,8 @@ from functools import cache
 from zoneinfo import available_timezones
 
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 
 
 @cache
@@ -35,3 +37,46 @@ class TimezoneSchema:
 
     def is_valid(self) -> bool:
         return all([self.is_valid_timezone()])
+
+
+@dataclass
+class EmailSchema:
+    email: str
+
+    @classmethod
+    def from_post(cls, request) -> "EmailSchema":
+        obj = cls(email=request.POST.get("email", "").strip().lower())
+        obj._request = request
+        return obj
+
+    def is_valid_email(self) -> bool:
+        try:
+            validate_email(self.email)
+        except ValidationError:
+            messages.error(self._request, "Enter your email address")
+            return False
+        return True
+
+    def is_valid(self) -> bool:
+        return all([self.is_valid_email()])
+
+
+@dataclass
+class CodeSchema:
+    code: str
+
+    @classmethod
+    def from_post(cls, request) -> "CodeSchema":
+        obj = cls(code="".join(ch for ch in request.POST.get("code", "") if ch.isdigit()))
+        obj._request = request
+        return obj
+
+    def is_valid_code(self) -> bool:
+        if len(self.code) != 6:
+            messages.error(self._request, "Enter the 6-digit code from the email")
+            return False
+        return True
+
+    def is_valid(self) -> bool:
+        return all([self.is_valid_code()])
+

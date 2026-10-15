@@ -128,3 +128,123 @@ class ClaimTests(TestCase):
 
     def test_unverified_google_email_is_rejected(self):
         self.assertIsNone(GoogleProfile.from_userinfo({"email": "a@x.com", "email_verified": False}))
+
+
+
+@override_settings(RESEND_API_KEY="test-key")
+class EmailCodeTests(TestCase):
+    """Signing in by email: a 6-digit code goes to the address; typing it back signs you in. No passwords."""
+
+    def setUp(self):
+        from unittest.mock import patch
+        self.sent = []
+        patcher = patch("accounts.services.code_service.MailService.send", side_effect=lambda to, subject, text: self.sent.append((to, text)) or True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def code(self):
+        import re
+        return re.search(r"\b(\d{6})\b", self.sent[-1][1]).group(1)
+
+    def start(self, email):
+        return self.client.post(reverse("accounts:email"), {"email": email})
+
+    def signed_in(self):
+        return User.objects.filter(pk=self.client.session.get("_auth_user_id")).first()
+
+    def test_the_login_page_offers_google_and_an_email_code(self):
+        page = self.client.get(reverse("accounts:login"))
+        self.assertContains(page, 'name="email"')
+        self.assertContains(page, ">Send code</button>")
+        self.assertNotContains(page, "password")
+
+    def test_a_new_email_gets_a_code_and_the_code_makes_the_account(self):
+        self.assertRedirects(self.start("New@X.com"), reverse("accounts:code"))
+        self.assertEqual(self.sent[0][0], "new@x.com")
+        self.assertContains(self.client.get(reverse("accounts:code")), "Enter the code")
+        response = self.client.post(reverse("accounts:code"), {"code": self.code()})
+        self.assertRedirects(response, reverse("board:index"), fetch_redirect_response=False)
+        user = User.objects.get(email="new@x.com")
+        self.assertEqual(self.signed_in(), user)
+        self.assertFalse(user.has_usable_password())
+
+    def test_an_existing_google_account_signs_in_by_code_into_the_same_account(self):
+        user = IdentityService.create_user("old@x.com", name="Old")
+        self.start("old@x.com")
+        self.client.post(reverse("accounts:code"), {"code": self.code()})
+        self.assertEqual(self.signed_in(), user)
+        self.assertEqual(User.objects.filter(email="old@x.com").count(), 1)
+
+    def test_a_wrong_code_counts_down_and_then_stops_working(self):
+        self.start("new@x.com")
+        right = self.code()
+        wrong = "000000" if right != "000000" else "111111"
+        self.assertContains(self.client.post(reverse("accounts:code"), {"code": wrong}), "4 tries left")
+        for _ in range(4):
+            self.client.post(reverse("accounts:code"), {"code": wrong})
+        self.assertContains(self.client.post(reverse("accounts:code"), {"code": right}), "expired")
+        self.assertIsNone(self.signed_in())
+        self.assertFalse(User.objects.filter(email="new@x.com").exists())
+
+    def test_a_code_works_once_and_a_new_one_replaces_the_old(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from accounts.models import EmailCode
+        self.start("new@x.com")
+        old = self.code()
+        EmailCode.objects.update(created_at=timezone.now() - timedelta(minutes=1))
+        self.client.post(reverse("accounts:resend-code"))
+        self.assertEqual(len(self.sent), 2)
+        self.assertContains(self.client.post(reverse("accounts:code"), {"code": old if old != self.code() else "000000"}), "form-message--error")
+
+    def test_codes_are_rationed(self):
+        self.start("new@x.com")
+        self.assertContains(self.client.post(reverse("accounts:resend-code"), follow=True), "A code was just sent")
+        self.assertEqual(len(self.sent), 1)
+
+    def test_an_old_code_has_expired(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from accounts.models import EmailCode
+        self.start("new@x.com")
+        EmailCode.objects.update(created_at=timezone.now() - timedelta(minutes=16))
+        self.assertContains(self.client.post(reverse("accounts:code"), {"code": self.code()}), "expired")
+
+    def test_a_disabled_account_cannot_get_in(self):
+        IdentityService.create_user("gone@x.com", is_active=False)
+        self.start("gone@x.com")
+        self.assertEqual(self.sent, [])
+        self.assertIsNone(self.signed_in())
+
+    def test_a_guests_todos_come_along(self):
+        self.client.get(reverse("board:index"))   # a guest, from the first visit
+        guest = User.objects.get(is_guest=True)
+        TodoService.create(guest, TodoTitleSchema(title="from the guest"))
+        self.start("new@x.com")
+        self.client.post(reverse("accounts:code"), {"code": self.code()})
+        user = User.objects.get(email="new@x.com")
+        self.assertEqual(list(TodoService.open_for(user).values_list("title", flat=True)), ["from the guest"])
+
+    def test_the_code_step_needs_an_email_first(self):
+        self.assertRedirects(self.client.get(reverse("accounts:code")), reverse("accounts:login"))
+
+    def test_only_the_codes_hash_is_kept(self):
+        from accounts.models import EmailCode
+        self.start("new@x.com")
+        self.assertNotIn(self.code(), EmailCode.objects.get().code_hash)
+
+
+class KeepSignedInTests(TestCase):
+    def test_a_signed_in_session_lasts_400_days_and_is_moved_on_at_most_daily(self):
+        from django.conf import settings
+        from accounts.middleware import REFRESHED
+        self.assertEqual(settings.SESSION_COOKIE_AGE, 60 * 60 * 24 * 400)
+        self.client.force_login(IdentityService.create_user("me@x.com"))
+        self.client.get(reverse("board:index"))
+        first = self.client.session[REFRESHED]
+        session = self.client.session
+        session[REFRESHED] = first - 2 * 24 * 3600   # as if last moved on two days ago
+        session.save()
+        response = self.client.get(reverse("board:index"))
+        self.assertGreater(self.client.session[REFRESHED], first - 3600)
+        self.assertIn("sessionid", response.cookies)   # a fresh cookie, good for another 400 days

@@ -49,6 +49,7 @@ a.text-btn { display: inline-block; }
 .topbar:hover .topbar__brand, .topbar:hover .topbar__actions > *,
 .topbar:focus-within .topbar__brand, .topbar:focus-within .topbar__actions > *,
 .topbar:has(.account-menu--open) .topbar__brand, .topbar:has(.account-menu--open) .topbar__actions > * { opacity: 1; }
+.topbar__home { color: inherit; text-decoration: none; }
 .topbar__brand { font-size: 15px; font-weight: 600; letter-spacing: -0.03em; }
 .logo { display: inline-flex; align-items: center; gap: 0.4em; }
 .logo__mark { width: 1.15em; height: auto; flex: none; }

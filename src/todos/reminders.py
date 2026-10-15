@@ -15,6 +15,12 @@ def clock(moment: datetime) -> str:
     return f"{local.hour % 12 or 12}{minutes}{'am' if local.hour < 12 else 'pm'}"
 
 
+def clock_full(moment: datetime) -> str:
+    """10:00 am, 08:30 pm: always two-digit hours and minutes, for a meeting's row, where the times line up in a column."""
+    local = timezone.localtime(moment)
+    return f"{local.hour % 12 or 12:02d}:{local.minute:02d} {'am' if local.hour < 12 else 'pm'}"
+
+
 def when(moment: datetime) -> str:
     """For a row: 6pm, tmrw 7am, th 7am, 23 oct."""
     local = timezone.localtime(moment)

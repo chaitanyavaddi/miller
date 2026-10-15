@@ -118,6 +118,18 @@ def meeting_fields(title: str, starts_at: datetime | None, ends_at: datetime | N
     )
 
 
+def as_account(url: str, email: str) -> str:
+    """A Google link (Meet, Calendar) that opens in the account the meeting came from, not whichever Google account the
+    browser has first: Google reads ?authuser=<email>. Other links come back as they were."""
+    if not url or not email:
+        return url
+    parts = urllib.parse.urlsplit(url)
+    if parts.netloc not in ("meet.google.com", "www.google.com", "calendar.google.com"):
+        return url
+    query = [(k, v) for k, v in urllib.parse.parse_qsl(parts.query, keep_blank_values=True) if k != "authuser"]
+    return urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode([*query, ("authuser", email)])))
+
+
 class GoogleCalendarApi:
     @staticmethod
     def calendars(token: str, email: str) -> list[RemoteCalendar]:
@@ -135,24 +147,31 @@ class GoogleCalendarApi:
         while url:
             page = call("GET", url, token)
             for item in page.get("items", []):
-                yield RemoteEvent(item["id"], GoogleCalendarApi.fields(item))
+                yield RemoteEvent(item["id"], GoogleCalendarApi.fields(item, account=calendar_id))   # the primary calendar's id is its address
             next_page = page.get("nextPageToken")
             url = base + urllib.parse.urlencode({**query, "pageToken": next_page}) if next_page else ""
 
     @staticmethod
-    def fields(item: dict) -> MeetingFields | None:
+    def fields(item: dict, account: str = "") -> MeetingFields | None:
+        """A meeting, or None: all-day, cancelled, declined, a block (focus time, out of office, working location,
+        birthdays), or an event with nobody else on it and no call link (lunch, "deep work")."""
         start, end = item.get("start") or {}, item.get("end") or {}
-        declined = any(a.get("self") and a.get("responseStatus") == "declined" for a in item.get("attendees") or [])
-        if "date" in start or item.get("status") == "cancelled" or declined or item.get("eventType") == "workingLocation":
+        attendees = item.get("attendees") or []
+        declined = any(a.get("self") and a.get("responseStatus") == "declined" for a in attendees)
+        if "date" in start or item.get("status") == "cancelled" or declined or item.get("eventType", "default") != "default":
             return None
         video = next((p.get("uri", "") for p in (item.get("conferenceData") or {}).get("entryPoints") or [] if p.get("entryPointType") == "video"), "")
+        link = item.get("hangoutLink") or video or meeting_link(item.get("location", ""), item.get("description", ""))
+        others = [a for a in attendees if not a.get("self") and not a.get("resource")]   # people, not you or a room
+        if not others and not link:
+            return None
         return meeting_fields(
             item.get("summary", ""),
             parse_datetime(start.get("dateTime") or ""),
             parse_datetime(end.get("dateTime") or ""),
-            item.get("hangoutLink") or video or meeting_link(item.get("location", ""), item.get("description", "")),
+            as_account(link, account),
             item.get("iCalUID", ""),
-            item.get("htmlLink", ""),
+            as_account(item.get("htmlLink", ""), account),
         )
 
     @staticmethod
@@ -197,7 +216,7 @@ class MicrosoftCalendarApi:
         """Every occurrence in the window (calendarView expands recurring events), times in UTC."""
         query = {
             "startDateTime": start.astimezone(UTC).isoformat(), "endDateTime": end.astimezone(UTC).isoformat(), "$top": "100",
-            "$select": "id,iCalUId,subject,start,end,isAllDay,isCancelled,responseStatus,onlineMeeting,onlineMeetingUrl,location,bodyPreview,webLink",
+            "$select": "id,iCalUId,subject,start,end,isAllDay,isCancelled,responseStatus,onlineMeeting,onlineMeetingUrl,location,bodyPreview,webLink,attendees,showAs",
         }
         url = f"{GRAPH_API}/me/calendars/{urllib.parse.quote(calendar_id, safe='')}/calendarView?" + urllib.parse.urlencode(query)
         while url:
@@ -208,14 +227,21 @@ class MicrosoftCalendarApi:
 
     @staticmethod
     def fields(item: dict) -> MeetingFields | None:
+        """As Google's: a meeting has someone else on it or a call link; blocks (away, working elsewhere) aren't meetings."""
         if item.get("isAllDay") or item.get("isCancelled") or (item.get("responseStatus") or {}).get("response") == "declined":
+            return None
+        if item.get("showAs") in ("oof", "workingElsewhere"):
+            return None
+        link = ((item.get("onlineMeeting") or {}).get("joinUrl") or item.get("onlineMeetingUrl")
+                or meeting_link((item.get("location") or {}).get("displayName", ""), item.get("bodyPreview", "")))
+        others = [a for a in item.get("attendees") or [] if a.get("type") != "resource"]   # Graph leaves the organiser out
+        if not others and not link:
             return None
         return meeting_fields(
             item.get("subject", ""),
             MicrosoftCalendarApi._utc((item.get("start") or {}).get("dateTime")),
             MicrosoftCalendarApi._utc((item.get("end") or {}).get("dateTime")),
-            (item.get("onlineMeeting") or {}).get("joinUrl") or item.get("onlineMeetingUrl")
-            or meeting_link((item.get("location") or {}).get("displayName", ""), item.get("bodyPreview", "")),
+            link,
             item.get("iCalUId", ""),
             item.get("webLink", ""),
         )

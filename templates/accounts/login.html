@@ -2,20 +2,48 @@
 
 {% block title %}Sign in · Miller{% endblock %}
 
+{% block extra_js %}<script src="{% static 'js/signin.js' %}" defer></script>{% endblock %}
+
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/accounts.css' %}">
 {% endblock %}
 
 {% block content %}
+{% comment %}Two steps: start (an email; under it, Google on the left and Send code on the right) → code (the 6 digits emailed to it). The email and code lines are the
+app's own composer, in a dotted box, with its ↵ button inline.{% endcomment %}
 <main class="signin">
-  <h1 class="signin__title">{% if signed_out %}You’re signed out.{% else %}<a class="signin__home" href="{% url 'board:home' %}" aria-label="Miller home"><c-ui.logo /></a>{% endif %}</h1>
-  <c-ui.messages />
-  {% if google_enabled %}
-    <a class="text-btn signin__action" href="{% url 'accounts:google-start' %}">{% if signed_out %}Sign back in{% else %}Continue with Google{% endif %}</a>
-    {% if request.user.is_guest %}<p class="signin__note">Your todos from this browser will come with you.</p>{% endif %}
-    <a class="text-btn signin__action" href="{% url 'board:index' %}">Back to the list</a>
+  <h1 class="signin__title">
+    {% if step == "code" %}Enter the code{% elif signed_out %}You’re signed out.{% else %}<a class="signin__home" href="{% url 'board:home' %}" aria-label="Miller home"><c-ui.logo /></a>{% endif %}
+  </h1>
+
+  {% if step == "start" %}
+    {% if email_enabled %}
+    <form class="composer signin__line" id="email-form" method="post" action="{% url 'accounts:email' %}">
+      {% csrf_token %}
+      <input class="composer__input" type="email" name="email" value="{{ email }}" placeholder="Enter your email" autocomplete="email" aria-label="Email" enterkeyhint="send" required>
+    </form>
+    {% endif %}
+    <div class="signin__asides">
+      {% if google_enabled %}<a class="text-btn text-btn--small signin__aside" href="{% url 'accounts:google-start' %}">{% if email_enabled %}or with {% endif %}Google</a>{% else %}<span></span>{% endif %}
+      {% if email_enabled %}<button type="submit" form="email-form" class="text-btn text-btn--small signin__aside signin__go">Send code</button>{% endif %}
+    </div>
+    <c-ui.messages />
+    {% if not google_enabled and not email_enabled %}<p class="signin__note">Sign-in isn’t configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or RESEND_API_KEY.</p>{% endif %}
+
   {% else %}
-    <p class="signin__note">Google sign-in isn’t configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.</p>
+    {% comment %}Six boxes, one real input laid over them: typing, pasting and the phone's code autofill all land in it,
+    and signin.js shows each digit in its box and sends the form once all six are in.{% endcomment %}
+    <form class="signin__code" method="post" action="{% url 'accounts:code' %}" data-code-form>
+      {% csrf_token %}
+      <input class="signin__code-input" type="text" name="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" aria-label="Code from your email" required autofocus data-code-input>
+      <div class="signin__boxes" aria-hidden="true">{% for _ in "123456" %}<span class="signin__box" data-code-box></span>{% endfor %}</div>
+    </form>
+    <c-ui.messages />
+    <div class="signin__asides">
+      <a class="text-btn text-btn--small signin__aside" href="{% url 'accounts:login' %}">‹ Back</a>
+      <button type="submit" form="resend-code" class="text-btn text-btn--small signin__aside">Resend</button>
+    </div>
+    <form id="resend-code" method="post" action="{% url 'accounts:resend-code' %}" hidden>{% csrf_token %}</form>
   {% endif %}
 </main>
 {% endblock %}

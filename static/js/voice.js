@@ -114,6 +114,31 @@
   if (window.ResizeObserver) new ResizeObserver(sizeArc).observe(stage);
   window.addEventListener('resize', () => { if (on) sizeArc(); });
 
+  /* ———————————————————————— an opening line, until the first command ———————————————————————— */
+
+  /* Turned on, the arch asks one open question, the way a person would, so it's clear Miller is listening and what for.
+   * Not instructions: something to answer. It goes once they speak. */
+  const OPENERS = [
+    'What are we doing today?',
+    'What’s on your mind?',
+    'What needs doing?',
+    'Anything done already?',
+    'What’s next?',
+    'Tell me, I’ll sort it.',
+    'Anything to move or drop?',
+  ];
+
+  function startTips() {
+    reply.classList.add('is-tip');
+    write(reply, OPENERS[Math.floor(Math.random() * OPENERS.length)]);
+  }
+
+  function stopTips() {
+    if (!reply.classList.contains('is-tip')) return;
+    reply.classList.remove('is-tip');
+    write(reply, '');
+  }
+
   /* ———————————————————————— turning voice mode on and off ———————————————————————— */
 
   async function setOn(value) {
@@ -133,8 +158,9 @@
       if (limited) { stopForLimit(bar.dataset.limitMessage || 'You’ve reached your voice limit.'); return; }
       if (!supported()) { write(reply, 'Voice needs a browser that can record audio: Chrome, Edge, Firefox or Safari.'); setState('listening', 'Not supported'); return; }
       if (!(await openMic()) && on) { write(reply, 'Miller needs the microphone. Allow it in the browser, then turn voice on again.'); setState('listening', 'Microphone blocked'); return; }
-      if (on) { beginSegment(); ticker = setInterval(tick, TICK_MS); }
+      if (on) { beginSegment(); ticker = setInterval(tick, TICK_MS); startTips(); }
     } else {
+      stopTips();
       clearInterval(ticker); clearTimeout(waitTimer); ticker = null;
       endSegment(false);
       releaseMic();
@@ -234,6 +260,7 @@
   async function send(blob) {
     const command = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), finished: false };
     turn = command;
+    stopTips();
     setState('thinking');
     clearTimeout(waitTimer);
     waitTimer = setTimeout(() => onResult({ turn: command.id, reply: 'That took too long. Try again.', outcome: 'failed', undo: null }), WAIT_MS);
