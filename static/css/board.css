@@ -112,9 +112,9 @@
 .review__table-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 12px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .review__table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .review__th { position: sticky; top: 0; background: var(--bg); text-align: left; font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0 8px; white-space: nowrap; }
-.review__th:nth-child(2) { width: 88px; }
-.review__th:nth-child(3) { width: 88px; }
-.review__th:nth-child(4) { width: 112px; }
+.review__num { width: 32px; color: var(--text-4); }
+.review__table td.review__meta--right { width: 56px; }
+.review__table td.review__action { width: 72px; }
 .review__th--right, .review__meta--right { text-align: right; padding-right: 16px; }
 .review__row:hover .review__title { color: var(--text); }
 .review__open { max-width: 100%; background: none; border: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -130,6 +130,20 @@
 .review-thread__head { display: flex; flex-direction: column; gap: 12px; }
 .review-thread__title { margin: 0; font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -0.025em; overflow-wrap: anywhere; }
 .review-thread__comments { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 12px; display: flex; flex-direction: column; gap: 20px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+/* the rail of days: one thin line of dates, scrolling sideways, today at the right end */
+.review-rail { display: flex; align-items: center; height: 28px; border-bottom: 1px solid var(--border); }
+.review-rail__days { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; overflow-x: auto; scroll-behavior: smooth; scrollbar-width: none; }
+.review-rail__days::-webkit-scrollbar { display: none; }
+.review-rail__step { flex: none; width: 20px; height: 28px; padding: 0; background: none; border: none; cursor: pointer; color: var(--text-4); font-size: 15px; line-height: 1; }
+.review-rail__step:hover { color: var(--text); }
+.review-rail__month { flex: none; padding: 0 6px 0 10px; font-family: var(--font-mono); font-size: 10px; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.06em; }
+.review-rail__day { position: relative; flex: none; width: 28px; height: 28px; padding: 0; background: none; border: none; cursor: pointer;
+  font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-4); opacity: 0.5; }
+.review-rail__day.has-done { color: var(--text-2); opacity: 1; }
+.review-rail__day:hover { color: var(--text); opacity: 1; }
+.review-rail__day.is-on { color: var(--text); opacity: 1; font-weight: 600; }
+.review-rail__day.is-on::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 1px; background: var(--text); }  /* sits on the rail's line */
+.review__day-title { margin: 20px 0 8px; color: var(--text-2); }
 .review__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 @media (max-width: 760px) {

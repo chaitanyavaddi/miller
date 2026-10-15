@@ -1,5 +1,5 @@
 <c-vars row quiet="" />
-<span class="review__actions">  {# reopen always shows; delete comes up on the row's hover #}
-  <c-ui.icon-button label="Reopen" title="Reopen" class="icon-btn--small" hx-post="{% url 'board:todo-reopen' row.id %}" hx-vals='{"index": 1, "select": "1"}' hx-target="#workspace" hx-swap="outerHTML"><c-ui.icon name="reopen" size="14" sw="1.6" /></c-ui.icon-button>
+<span class="review__actions">  {# in the list both come up on the row's hover; in a thread they always show #}
+  <c-ui.icon-button label="Reopen" title="Reopen" class="icon-btn--small{% if quiet %} icon-btn--quiet{% endif %}" hx-post="{% url 'board:todo-reopen' row.id %}" hx-vals='{"index": 1, "select": "1"}' hx-target="#workspace" hx-swap="outerHTML"><c-ui.icon name="reopen" size="14" sw="1.6" /></c-ui.icon-button>
   <c-ui.icon-button label="Delete" title="Delete" class="icon-btn--small{% if quiet %} icon-btn--quiet{% endif %}" hx-post="{% url 'board:review-delete' row.id %}" hx-include="#board-state" hx-target="closest .overlay" hx-swap="outerHTML"><c-ui.icon name="trash" size="14" sw="1.6" /></c-ui.icon-button>
 </span>

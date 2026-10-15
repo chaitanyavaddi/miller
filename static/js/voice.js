@@ -301,7 +301,7 @@
   function navigate(go) {
     if (go.to === 'end') { setTimeout(() => { if (on) setOn(false); }, 1500); return; }   /* the goodbye stays on screen a moment */
     if (go.to === 'close_panel') document.dispatchEvent(new Event('overlay-close'));
-    else if (go.to === 'all_todos') openPanel(bar.dataset.reviewUrl);
+    else if (go.to === 'all_todos') openPanel(go.day ? `${bar.dataset.reviewUrl}?day=${go.day}` : bar.dataset.reviewUrl);
     else if (go.to === 'settings') openPanel(bar.dataset.settingsUrl);
     else if (go.to === 'usage') openPanel(`${bar.dataset.settingsUrl}?open=usage`);
     else if (go.to === 'todo' && go.id) openTodo(go.id);

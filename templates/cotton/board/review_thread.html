@@ -1,7 +1,7 @@
 <c-vars row comments />
 <div class="review-thread">
   <div class="review-thread__bar">
-    <c-ui.text-button class="text-btn--small" hx-get="{% url 'board:review' %}" hx-target="closest .overlay" hx-swap="outerHTML">← All todos</c-ui.text-button>
+    <c-ui.text-button class="text-btn--small" hx-get="{% url 'board:review' %}?day={{ row.day }}" hx-target="closest .overlay" hx-swap="outerHTML">← {{ row.stamp }}</c-ui.text-button>
     <c-board.review-actions :row="row" />
   </div>
   <div class="review-thread__head">

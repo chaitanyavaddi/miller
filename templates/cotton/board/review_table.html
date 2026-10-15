@@ -2,28 +2,20 @@
 <div class="review__table-wrap">
   {% if rows %}
   <table class="review__table">
-    <thead>
-      <tr>
-        <th class="review__th">Todo</th>
-        <th class="review__th">Closed</th>
-        <th class="review__th review__th--right">On list</th>
-        <th class="review__th"><span class="review__sr">Actions</span></th>
-      </tr>
-    </thead>
     <tbody>
       {% for row in rows %}
       <tr class="review__row">
+        <td class="review__meta review__num">{{ forloop.counter|stringformat:"02d" }}</td>
         <td class="review__title">
           <button type="button" class="review__open" title="See its thread" hx-get="{% url 'board:review-thread' row.id %}" hx-target="#review-body" hx-swap="innerHTML">{{ row.title }}</button>
         </td>
-        <td class="review__meta">{{ row.stamp }}</td>
-        <td class="review__meta review__meta--right">{% if row.is_meeting %}meeting{% else %}{{ row.days_on_list }}d{% endif %}</td>
+        <td class="review__meta review__meta--right">{% if row.is_meeting %}<span title="Meeting"><c-ui.icon name="calendar" size="12" sw="1.6" /></span>{% else %}<span title="{{ row.days_on_list }} day{{ row.days_on_list|pluralize }} on the list">{{ row.days_on_list }}d</span>{% endif %}</td>
         <td class="review__action">{% if not row.is_meeting %}<c-board.review-actions :row="row" quiet="1" />{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
   {% else %}
-  <p class="review__empty">Nothing closed yet.</p>
+  <p class="review__empty">Nothing done on this day.</p>
   {% endif %}
 </div>

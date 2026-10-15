@@ -262,8 +262,13 @@ class CommandService:
                     result.lines.append(f"Opened {quote(opened.title)}")
                     result.go = {"to": Target.TODO, "id": opened.id}
                 else:
-                    result.lines.append("Closed the panel" if operation.target == Target.CLOSE_PANEL else f"Opened {OPENED[operation.target]}")
-                    result.go = {"to": operation.target}
+                    day, _, _ = CommandService._when(operation)
+                    if operation.target == Target.ALL_TODOS and day and day <= timezone.localdate():   # "what did I do last Tuesday"
+                        result.lines.append(f"Opened what you did on {ScheduleService.short_date(day)}")
+                        result.go = {"to": operation.target, "day": day.isoformat()}
+                    else:
+                        result.lines.append("Closed the panel" if operation.target == Target.CLOSE_PANEL else f"Opened {OPENED[operation.target]}")
+                        result.go = {"to": operation.target}
             elif operation.op == Op.SCHEDULE:
                 todo = CommandService._schedule(user, operation, result)
             elif operation.op in (Op.EDIT_UPDATE, Op.DELETE_UPDATE):

@@ -399,6 +399,14 @@ class NavigationTests(VoiceBase):
             _, _, applied = self.run_ops(Operation(Op.OPEN, target=target))
             self.assertEqual((applied.go, applied.lines), ({"to": target}, [line]))
 
+    def test_all_todos_can_open_on_a_past_day_but_not_a_future_one(self):
+        tuesday = timezone.localdate() - timedelta(days=2)
+        _, _, applied = self.run_ops(Operation(Op.OPEN, target=Target.ALL_TODOS, date=tuesday.isoformat()))
+        self.assertEqual(applied.go, {"to": Target.ALL_TODOS, "day": tuesday.isoformat()})
+        for day in ((timezone.localdate() + timedelta(days=2)).isoformat(), "last tuesday"):
+            _, _, applied = self.run_ops(Operation(Op.OPEN, target=Target.ALL_TODOS, date=day))
+            self.assertEqual((applied.go, applied.lines), ({"to": Target.ALL_TODOS}, ["Opened All todos"]))
+
     def test_opening_nowhere_or_a_todo_that_isnt_there_is_dropped(self):
         for operation in (Operation(Op.OPEN, target="the moon"), Operation(Op.OPEN, target=None), Operation(Op.OPEN, 9999, target=Target.TODO), Operation(Op.OPEN, target=Target.TODO)):
             valid, problems, _ = self.run_ops(operation)

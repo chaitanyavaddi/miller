@@ -14,4 +14,25 @@
     e.stopImmediatePropagation();
     if (kept !== overlay.lastElementChild) overlay.append(kept);
   }, true);
+
+  /* Past's rail of days: the picked one in view (today, at the right end, at first); the arrows step a week. */
+  function centre() {
+    const days = document.querySelector('#overlay [data-rail-days]');
+    if (!days || days._placed) return;
+    days._placed = true;
+    const on = days.querySelector('.is-on');
+    days.style.scrollBehavior = 'auto';
+    days.scrollLeft = on ? on.offsetLeft - days.offsetLeft - (days.clientWidth - on.offsetWidth) / 2 : days.scrollWidth;
+    days.style.scrollBehavior = '';
+  }
+
+  document.addEventListener('click', e => {
+    const step = e.target.closest && e.target.closest('[data-rail-step]');
+    if (!step) return;
+    const days = step.closest('[data-rail]').querySelector('[data-rail-days]');
+    days.scrollBy({ left: Number(step.dataset.railStep) * 7 * 28 });
+  });
+
+  document.addEventListener('htmx:after:swap', centre);
+  centre();
 })();

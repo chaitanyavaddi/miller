@@ -1,9 +1,21 @@
-<c-vars rows />
+<c-vars rail rows day day_label />
 <div class="overlay" data-timeline-pane="past">
   <div class="overlay__scrim" aria-hidden="true"></div>  {# closes by ✕, like the rest of Timeline #}
   <div class="review timeline" role="dialog" aria-modal="true" aria-labelledby="timeline-title">
     <c-timeline.bar tab="past" />
     <div class="review__body" id="review-body">
+      {% comment %}The rail: every day from the first one something was done (at least a month back) to today, left to right.
+      A day with something done is darker; picking one shows them below. timeline.js keeps the picked day in view.{% endcomment %}
+      <div class="review-rail" data-rail>
+        <button type="button" class="review-rail__step" data-rail-step="-1" aria-label="Earlier days" title="Earlier">‹</button>
+        <div class="review-rail__days" data-rail-days>
+          {% for d in rail %}{% if d.month %}<span class="review-rail__month" aria-hidden="true">{{ d.month }}</span>{% endif %}<button type="button" class="review-rail__day{% if d.is_on %} is-on{% endif %}{% if d.count %} has-done{% endif %}{% if d.is_today %} is-today{% endif %}"
+                  aria-label="{{ d.value }}: {{ d.count }} done" title="{{ d.weekday }} · {{ d.count }} done"{% if d.is_on %} aria-current="date"{% endif %}
+                  hx-get="{% url 'board:review' %}?day={{ d.value }}" hx-target="closest .overlay" hx-swap="outerHTML">{{ d.number }}</button>{% endfor %}
+        </div>
+        <button type="button" class="review-rail__step" data-rail-step="1" aria-label="Later days" title="Later">›</button>
+      </div>
+      <p class="eyebrow review__day-title">{{ day_label }}{% if rows %} · {{ rows|length }} done{% endif %}</p>
       <c-board.review-table :rows="rows" />
     </div>
   </div>

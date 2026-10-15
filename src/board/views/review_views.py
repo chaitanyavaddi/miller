@@ -9,8 +9,11 @@ from utils.view_helper import render_fragment, render_fragments
 
 
 class ReviewView(SignedInRequiredMixin, View):
+    """Past: the rail of days and what was closed on the one picked (?day=2026-10-14)."""
+
     def get(self, request):
-        return render_fragment(request, "board.review", ReviewService.build(request.user))
+        day = ReviewService.parse_day(request.GET.get("day"))
+        return render_fragment(request, "board.review", ReviewService.build(request.user, day))
 
 
 class ReviewTodoMixin(TodoPermissionRequiredMixin):
@@ -33,5 +36,7 @@ class ReviewDeleteView(ReviewTodoMixin, BoardResponseMixin, View):
     permission_required = "todos.delete_todo"
 
     def post(self, request, pk):
+        day = ReviewService.row(self.todo).day   # back to the day it was on
         TodoService.delete(self.todo)
-        return render_fragments(request, ("board.review", ReviewService.build(request.user)), self.workspace_oob())
+        built = ReviewService.build(request.user, ReviewService.parse_day(day))
+        return render_fragments(request, ("board.review", built), self.workspace_oob())

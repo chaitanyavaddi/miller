@@ -178,16 +178,17 @@ class BoardTests(TestCase):
         self.assertContains(response, "form-message--error")
         self.assertEqual(Comment.objects.count(), 0)
 
-    def test_all_todos_lists_only_closed_todos_most_recent_first(self):
+    def test_all_todos_opens_on_today_with_what_was_closed_today(self):
         TodoService.close(self.todos[0])
         TodoService.close(self.todos[1])
         Todo.objects.filter(pk=self.todos[0].pk).update(closed_at=timezone.now() - timedelta(days=2))
         response = self.client.get(self.url("review"))
-        titles = [row.title for row in response.context["rows"]]
-        self.assertEqual(titles, ["todo 2", "todo 1"])  # todo 3 is still open: not listed
+        self.assertEqual([row.title for row in response.context["rows"]], ["todo 2"])  # todo 1 is on its own day; todo 3 is open
         self.assertContains(response, 'id="timeline-title">All todos</span>')
-        self.assertContains(response, 'aria-label="Reopen"', count=2)
-        self.assertNotContains(response, "review__filter")
+        self.assertContains(response, 'aria-label="Reopen"', count=1)
+        day = (timezone.localdate() - timedelta(days=2)).isoformat()
+        older = self.client.get(self.url("review"), {"day": day})
+        self.assertEqual([row.title for row in older.context["rows"]], ["todo 1"])
 
     def test_deleted_and_open_todos_never_show_in_all_todos(self):
         TodoService.close(self.todos[0])
@@ -205,6 +206,7 @@ class BoardTests(TestCase):
         response = self.client.get(self.url("review-thread", self.todos[0]))
         self.assertContains(response, "what I learned")
         self.assertContains(response, "Closed ")
+        self.assertContains(response, f'?day={timezone.localdate().isoformat()}"')   # back to its day
         self.assertContains(response, 'aria-label="Reopen"')
         self.assertNotContains(response, 'id="comment-form"')
         self.assertNotContains(response, 'class="overlay"')  # only the table area is replaced
@@ -245,6 +247,75 @@ class BoardTests(TestCase):
         self.assertNotContains(self.client.get(self.url("review")), "todo 1")
 
 
+
+
+class ReviewRailTests(TestCase):
+    """All todos → Past: a rail of days, each with how many were done, and the chosen day's todos in the order they were done."""
+
+    def setUp(self):
+        from board.services import ReviewService
+        self.review = ReviewService
+        self.user = IdentityService.create_user("rail@x.com")
+        self.client.force_login(self.user)
+        self.today = timezone.localdate()
+
+    def done(self, title, days_ago=0, minutes=0, kind=Todo.Kind.TASK):
+        todo = TodoService.create(self.user, TodoTitleSchema(title=title))
+        when = timezone.now().replace(hour=12, minute=0) - timedelta(days=days_ago) + timedelta(minutes=minutes)
+        Todo.objects.filter(pk=todo.pk).update(closed_at=when, kind=kind)
+        return todo
+
+    def test_the_rail_runs_a_month_back_to_today_with_a_count_on_each_day(self):
+        self.done("a", 3), self.done("b", 3), self.done("c", 1)
+        built = self.review.build(self.user)
+        rail = {d.value: d for d in built["rail"]}
+        self.assertEqual(len(built["rail"]), 30)
+        self.assertEqual(built["rail"][-1].value, self.today.isoformat())
+        self.assertTrue(built["rail"][-1].is_today)
+        self.assertEqual(rail[(self.today - timedelta(days=3)).isoformat()].count, 2)
+        self.assertEqual(rail[(self.today - timedelta(days=2)).isoformat()].count, 0)
+        self.assertTrue(built["rail"][0].month)   # its first day says the month
+
+    def test_it_reaches_back_to_the_first_day_something_was_done_but_no_more_than_a_year(self):
+        self.done("old", 90)
+        self.assertEqual(self.review.build(self.user)["rail"][0].value, (self.today - timedelta(days=90)).isoformat())
+        self.done("ancient", 800)
+        self.assertEqual(len(self.review.build(self.user)["rail"]), 365)
+
+    def test_with_nothing_done_today_it_opens_on_the_last_day_something_was(self):
+        self.done("c", 4)
+        built = self.review.build(self.user)
+        self.assertEqual(built["day"], (self.today - timedelta(days=4)).isoformat())
+        self.assertEqual([r.title for r in built["rows"]], ["c"])
+        self.assertEqual(sum(d.is_on for d in built["rail"]), 1)
+
+    def test_a_days_todos_come_in_the_order_they_were_done_with_their_notes(self):
+        second, first = self.done("second", 1, minutes=30), self.done("first", 1)
+        Comment.objects.create(todo=second, body="a note")
+        Comment.objects.create(todo=second, body="Moved to Fri", automatic=True)   # Miller's own notes don't count
+        rows = self.review.build(self.user, self.today - timedelta(days=1))["rows"]
+        self.assertEqual([(r.title, r.notes) for r in rows], [("first", 0), ("second", 1)])
+
+    def test_meetings_are_in_the_days_list_with_the_tasks(self):
+        self.done("task", 0, minutes=-30)
+        self.done("Standup", 0, kind=Todo.Kind.MEETING)
+        built = self.review.build(self.user)
+        self.assertEqual([r.title for r in built["rows"]], ["task", "Standup"])
+        self.assertEqual(built["rail"][-1].count, 2)
+
+    def test_a_day_off_the_rail_or_unreadable_falls_back(self):
+        self.done("x", 0)
+        for raw in ("2099-01-01", "nonsense", ""):
+            response = self.client.get(reverse("board:review"), {"day": raw})
+            self.assertEqual(response.context["day"], self.today.isoformat(), raw)
+
+    def test_the_page_draws_the_rail_and_says_the_day(self):
+        self.done("x", 1)
+        response = self.client.get(reverse("board:review"), {"day": (self.today - timedelta(days=1)).isoformat()})
+        self.assertContains(response, "data-rail-days")
+        self.assertContains(response, "Yesterday · 1 done")
+        self.assertContains(response, 'aria-current="date"', count=1)
+        self.assertContains(self.client.get(reverse("board:review"), {"day": (self.today - timedelta(days=2)).isoformat()}), "Nothing done on this day.")
 
 
 class MeetingBoardTests(TestCase):
