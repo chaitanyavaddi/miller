@@ -22,7 +22,7 @@
 {% block content %}
 <c-layout.topbar :user="request.user" :voice="voice" />
 <div class="page">
-  <c-board.workspace :rows="rows" :current="current" :today_label="today_label" :comments="comments" :undo="undo" :done="done" :reopen_index="reopen_index" :recorder="recorder" :transcript="transcript" :can_record="can_record" />
+  <c-board.workspace :rows="rows" :current="current" :today_label="today_label" :comments="comments" :undo="undo" :recorder="recorder" :transcript="transcript" :can_record="can_record" />
 </div>
 <div id="overlay"{% if request.GET.settings %} hx-get="{% url 'board:settings' %}" hx-trigger="load" hx-swap="innerHTML"{% endif %}></div>
 <div class="notice" id="notice" role="status" aria-live="polite"></div>

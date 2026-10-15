@@ -1,9 +1,6 @@
-<c-vars rows current="" searching="" done="" reopen_index="" />
+<c-vars rows current="" searching="" />
 {% for row in rows %}
   <c-todos.row :row="row" :current="current" />
 {% empty %}
   {% if searching %}<p class="todo-list__empty todo-list__empty--nomatch">No matches.</p>{% endif %}
 {% endfor %}
-{% if not searching %}
-  {% for row in done %}<c-todos.done-row :row="row" :reopen_index="reopen_index" />{% endfor %}
-{% endif %}

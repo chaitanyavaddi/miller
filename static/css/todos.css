@@ -88,12 +88,6 @@
 span.todo-row__tick--done { cursor: default; }   /* an ended meeting's: shown, not clicked */
 
 /* — done rows: the last few closed todos end the list, quieter than the active ones — */
-.todo-row:not(.todo-row--done) + .todo-row--done { margin-top: 8px; }
-.todo-row--done .todo-row__main { height: 30px; cursor: default; }
-.todo-row--done .todo-row__pos { color: var(--text-4); display: flex; align-items: center; }
-.todo-row--done .todo-row__title { color: var(--text-4); text-decoration: line-through; text-decoration-color: var(--border); }
-.todo-row--done:hover .todo-row__title { color: var(--text-3); }
-.todo-row--done .todo-row__action { height: 30px; }
 
 @media (max-width: 760px) {
   .todo-list__rows { overflow: visible; margin-left: 0; padding-left: 0; }

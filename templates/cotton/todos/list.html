@@ -1,4 +1,4 @@
-<c-vars rows current done reopen_index today_label="" />
+<c-vars rows current today_label="" />
 <section class="board__pane todo-list" id="list" aria-label="Todos">
   <div class="pane-bar">
     <span class="eyebrow todo-list__label">Todos{% if today_label %} · {{ today_label }}{% endif %}</span>
@@ -12,7 +12,7 @@
   </div>
 
   <div class="todo-list__rows" id="rows">
-    <c-todos.rows :rows="rows" :current="current.id" :done="done" :reopen_index="reopen_index" />
+    <c-todos.rows :rows="rows" :current="current.id" />
   </div>
 
   <c-todos.form />

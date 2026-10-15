@@ -22,7 +22,7 @@ CONVERSATION_MINUTES = 30
 TURNS_KEPT = 10
 NOTES_PER_TODO = 3      # the latest notes the model sees under each todo, so it can find "my last note"
 NOTES_IN_ALL = 120
-EARLIER_DONE = 10       # the done list Miller shows below the todos: the same ones, so "reopen that one" means what the screen shows
+EARLIER_DONE = 10       # the last few done before today, so "reopen the dentist one" can reach them (they're in All todos)
 
 OPENED = {Target.ALL_TODOS: "All todos", Target.SETTINGS: "Settings", Target.USAGE: "your voice usage"}
 

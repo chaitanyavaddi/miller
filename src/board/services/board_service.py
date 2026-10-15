@@ -52,17 +52,6 @@ class BoardRow:
         return f"{self.age} day{'' if self.age == 1 else 's'} on list"
 
 
-@dataclass(frozen=True)
-class DoneRow:
-    id: int
-    title: str
-    closed_on: str   # how long ago, as the open rows show their age: "1d", "2d"
-    closed_date: str = ""   # the day itself, for the tooltip
-
-
-RECENTLY_DONE = 10
-
-
 class BoardService:
     """Read model for the board screen: the numbered list on the left, one todo's thread on the right."""
 
@@ -92,20 +81,9 @@ class BoardService:
         )
 
     @staticmethod
-    def done(user) -> list[DoneRow]:
-        """The last few todos closed, newest first: they close out the list, one click from reopening."""
-        now = timezone.now()
-        rows = []
-        for todo in TodoService.recently_closed(user, RECENTLY_DONE):
-            day = timezone.localtime(todo.closed_at).date()
-            days = InsightsService.days_between(todo.closed_at, now)   # calendar days, as the open rows count their age
-            rows.append(DoneRow(id=todo.id, title=todo.title, closed_on=f"{days}d" if days > 0 else "today", closed_date=f"{day:%b} {day.day}"))
-        return rows
-
-    @staticmethod
     def listing(user) -> dict:
         """Today's list: whatever scheduled items are due first land on it, then the user's order,
-        today's meetings, and the last few done ones."""
+        and today's meetings. Todos done before today aren't on it: they're in All todos."""
         ProductionService.produce_due(user)              # what's scheduled for today lands on top…
         TodoService.place_todays_meetings(user)          # …and today's meetings above it; carry-overs follow
         TodoService.close_ended_meetings(user)
@@ -113,8 +91,6 @@ class BoardService:
         return {
             "rows":         BoardService.rows(user),
             "today_label":  f"{today:%a}, {today:%b} {today.day}",  # Sun, Oct 11
-            "done":         BoardService.done(user),
-            "reopen_index": TodoService.ordered_for(user).count() + 1,
         }
 
     @staticmethod

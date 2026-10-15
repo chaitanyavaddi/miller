@@ -6,8 +6,8 @@
   const rows = () => document.getElementById('rows');
   /* Done rows close out the list but are not part of its order: nothing below moves or numbers them.
    * Timed rows (today's meetings) sort by their time after the user's own order, and stay put. */
-  const ACTIVE = '.todo-row:not(.todo-row--done)';
-  const ORDERED = '.todo-row:not(.todo-row--done)';  /* todos and meetings alike */
+  const ACTIVE = '.todo-row';
+  const ORDERED = '.todo-row';  /* todos and meetings alike */
   const isOrdered = el => !!el && el.matches(ORDERED);
   const isSearching = () => !!list() && list().classList.contains('todo-list--searching');
 
@@ -179,15 +179,14 @@
     });
   }
 
-  /* The row a drop lands in front of. Over a row of the done list, or below everything, it lands at
-   * the end of the user's order: in front of the first row that isn't part of it (null: the very end). */
+  /* The row a drop lands in front of; below everything, the very end (null). */
   function rowBefore(e) {
     const row = e.target.closest('.todo-row');
     if (isOrdered(row)) {
       const box = row.getBoundingClientRect();
       return e.clientY > box.top + box.height / 2 ? row.nextElementSibling : row;
     }
-    return document.querySelector('#rows .todo-row--done');
+    return null;
   }
 
   function saveOrder() {

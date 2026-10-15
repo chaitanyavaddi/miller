@@ -99,12 +99,12 @@ class BoardTests(TestCase):
         self.client.post(self.url("todo-reopen", self.todos[0]), {"index": 99})
         self.assertEqual(list(TodoService.open_for(self.user).values_list("title", flat=True)), ["todo 1", "todo 2", "todo 3"])
 
-    def test_done_yesterday_leaves_the_list_for_the_done_rows(self):
+    def test_done_before_today_is_not_on_todays_list_at_all(self):
         TodoService.close(self.todos[0])
         Todo.objects.filter(pk=self.todos[0].pk).update(closed_at=timezone.now() - timedelta(days=1))
         html = self.client.get(self.url("index")).content.decode()
+        self.assertNotIn("todo 1", html)
         self.assertNotIn("todo-row--closed", html)
-        self.assertIn("todo-row--done", html)
 
     def test_deleting_shows_a_quiet_undo_notice_and_undo_clears_it(self):
         response = self.client.post(self.url("todo-delete", self.todos[0]))
@@ -112,35 +112,6 @@ class BoardTests(TestCase):
         self.assertContains(response, "Deleted “todo 1”")
         response = self.client.post(self.url("todo-reopen", self.todos[0]), {"index": 1})
         self.assertNotContains(response, 'class="toast__item"')
-
-    def test_the_done_stack_shows_the_last_ten_closed_newest_first(self):
-        extra = [TodoService.create(self.user, TodoTitleSchema(title=f"extra {i}")) for i in range(10)]
-        for n, todo in enumerate(self.todos + extra):
-            TodoService.close(todo)
-            Todo.objects.filter(pk=todo.pk).update(closed_at=timezone.now() - timedelta(days=1, minutes=60 - n))  # done yesterday
-        TodoService.delete(TodoService.create(self.user, TodoTitleSchema(title="binned")))
-        page = self.client.get(self.url("index")).content.decode()
-        self.assertEqual(page.count("todo-row--done"), 10)
-        self.assertLess(page.index("extra 9"), page.index("extra 0"))
-        self.assertNotIn("binned", page)
-        self.assertNotIn("Recently done", page)  # no separate section: they end the list
-
-    def test_search_shows_only_active_matches_and_clearing_brings_done_back(self):
-        TodoService.close(self.todos[0])
-        Todo.objects.filter(pk=self.todos[0].pk).update(closed_at=timezone.now() - timedelta(days=1))
-        self.assertNotContains(self.client.get(self.url("todo-list"), {"q": "todo"}), "todo-row--done")
-        self.assertContains(self.client.get(self.url("todo-list"), {"q": ""}), "todo-row--done", count=1)
-
-    def test_reopening_from_the_done_stack_puts_it_at_the_end(self):
-        TodoService.close(self.todos[0])
-        Todo.objects.filter(pk=self.todos[0].pk).update(closed_at=timezone.now() - timedelta(days=1))
-        TodoService._renumber(self.user)
-        page = self.client.get(self.url("index"))
-        self.assertContains(page, '"index": 3')
-        html = page.content.decode()
-        self.assertLess(html.index("todo 3"), html.index("todo-row--done"))  # done rows come after the active ones
-        self.client.post(self.url("todo-reopen", self.todos[0]), {"index": 3})
-        self.assertEqual(list(TodoService.open_for(self.user).values_list("title", flat=True)), ["todo 2", "todo 3", "todo 1"])
 
     def test_deleting_offers_undo_and_undo_restores(self):
         self.assertContains(self.client.post(self.url("todo-delete", self.todos[0])), "Deleted")
@@ -465,27 +436,3 @@ class NotFoundPageTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertContains(response, "Nothing here.", status_code=404)
         self.assertContains(response, f'href="{reverse("board:home")}"', status_code=404)
-
-
-class DoneRowsAgeTests(TestCase):
-    """The done todos below the list say how long ago they were done, as open ones say their age: "1d", "2d"."""
-
-    def test_each_says_how_many_days_ago_and_keeps_the_date_for_its_tooltip(self):
-        from datetime import timedelta
-
-        from django.utils import timezone
-
-        from accounts.services import IdentityService
-        from board.services import BoardService
-        from todos.models import Todo
-        from todos.schemas import TodoTitleSchema
-        from todos.services import TodoService
-
-        user = IdentityService.create_user("done@x.com")
-        yesterday, older = (TodoService.create(user, TodoTitleSchema(title=t)) for t in ("yesterday", "older"))
-        for todo, days in ((yesterday, 1), (older, 3)):
-            TodoService.close(todo)
-            Todo.objects.filter(pk=todo.pk).update(closed_at=timezone.now() - timedelta(days=days))
-        rows = {row.title: row for row in BoardService.done(user)}
-        self.assertEqual((rows["yesterday"].closed_on, rows["older"].closed_on), ("1d", "3d"))
-        self.assertRegex(rows["older"].closed_date, r"^[A-Z][a-z]{2} \d{1,2}$")   # e.g. "Oct 11"

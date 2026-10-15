@@ -1,7 +1,7 @@
-<c-vars rows current comments done reopen_index today_label="" undo="" oob="" recorder="" transcript="" can_record="" />
+<c-vars rows current comments today_label="" undo="" oob="" recorder="" transcript="" can_record="" />
 <div class="board" id="workspace"{% if oob %} hx-swap-oob="true"{% endif %}
      hx-get="{% url 'board:workspace' %}" hx-trigger="board-changed from:body" hx-include="#board-state" hx-swap="outerHTML">
-  <c-todos.list :rows="rows" :current="current" :done="done" :reopen_index="reopen_index" :today_label="today_label" />
+  <c-todos.list :rows="rows" :current="current" :today_label="today_label" />
   <c-board.thread :current="current" :comments="comments" :recorder="recorder" :transcript="transcript" />
   {% if can_record %}
   {# Today's meetings still to start: recorder.js nudges "it started: record the call?" at each start, from this tab. #}
